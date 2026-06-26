@@ -42,6 +42,26 @@ class Athlete(Base):
     losses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Atleta personalizado criado pelo jogador (aparece em Mercado → Contratações).
     is_custom: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Nível do atleta (LVL 1..999). Sobe ganhando/perdendo partidas (ganhar conta mais).
+    level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    level_xp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Condição física: "ok" | "fatigued" (fadigado) | "injured" (lesionado).
+    condition: Mapped[str] = mapped_column(String, default="ok", nullable=False)
+    # Fadiga: jogos restantes de descanso (fora) até voltar; uso acumulado.
+    rest_games_left: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    games_since_rest: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Lesão: até quando (tempo real) e sequência de jogos difíceis seguidos.
+    injured_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hard_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Treino: último dia (real) em que treinou — limita a 1 treino por dia.
+    last_trained_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Venda: atleta anunciado pelo jogador, aguardando aprovação do dono.
+    for_sale: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sale_listed_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Marketplace de contratações: atleta veio de um anúncio do dono e expira
+    # (tempo real) após o período de validade definido na publicação.
+    listing_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

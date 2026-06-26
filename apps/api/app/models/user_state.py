@@ -3,7 +3,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Integer, Uuid, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -25,6 +25,10 @@ class UserState(Base):
     silver: Mapped[int] = mapped_column(Integer, default=STARTING_SILVER)
     gold: Mapped[int] = mapped_column(Integer, default=STARTING_GOLD)
     streak: Mapped[int] = mapped_column(Integer, default=0)
+    # Aprovação de entrada: contas novas (produção) entram bloqueadas até o dono
+    # aprovar. Default True para não bloquear contas/saves já existentes na
+    # migração; novas contas reais recebem False explicitamente no onboarding.
+    approved: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_login: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Estatísticas de partidas (Painel: jogadas / vitórias / derrotas / K-D).
     matches_played: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -30,6 +30,7 @@ class UserStateOut(BaseModel):
     matches_played: int = 0
     matches_won: int = 0
     matches_lost: int = 0
+    approved: bool = True
     lineup: Lineup
     club_id: uuid.UUID | None = None
 
@@ -77,25 +78,51 @@ class ScenarioOut(BaseModel):
     tactic: Tactic
     weather: Weather
     cpu_names: list[str]
+    cpu_team: str | None = None      # nome do time (quadra), em vez dos 6 nomes
     free_rerolls_left: int
     reroll_cost: int
 
 
 class CpuInfoOut(BaseModel):
     names: list[str]
+    team_name: str | None = None
     tier: str
     label: str
     tactic: Tactic
     weather: Weather | None = None
+    gold_awarded: int = 0
+    statuses: dict[str, str] = Field(default_factory=dict)
 
 
-class MatchStartRequest(BaseModel):
+class TimeoutEntry(BaseModel):
+    """Pedido de tempo: a partir deste rally (deste set) muda a tática do mandante."""
+
+    set_no: int = Field(ge=1)
+    rally_no: int = Field(ge=1)
+    tactic: Tactic
+
+
+class MatchSimRequest(BaseModel):
     kind: Literal["beach", "indoor"] = "beach"
     sex: Sex = Sex.MALE
     home_tactic: Tactic = Tactic.BALANCED
+    timeline: list[TimeoutEntry] = Field(default_factory=list)
 
 
-class MatchStartResult(BaseModel):
+class MatchSimResult(BaseModel):
     result: MatchResultOut
     cpu: CpuInfoOut
+
+
+class MatchFinishResult(BaseModel):
+    cpu: CpuInfoOut
     state: UserStateOut
+
+
+class TrainRequest(BaseModel):
+    athlete_id: uuid.UUID
+    training: str
+
+
+class TrainResult(BaseModel):
+    athlete: AthleteOut

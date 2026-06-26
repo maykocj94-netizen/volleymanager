@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.core.config import settings
 from app.core.deps import CurrentUser, DbSession
-from app.engine.cpu import cpu_names, difficulty_label
+from app.engine.cpu import cpu_names, cpu_team_name, difficulty_label
 from app.engine.match_engine import MatchResult
 from app.enums import Sex
 from app.models.user_state import LOGIN_STREAK_BONUS, SCENARIO_REROLL_COST, UserState
@@ -21,16 +21,20 @@ from app.schemas.user import (
     HireResult,
     Lineup,
     LoginResult,
+    MatchFinishResult,
     MatchResultReport,
-    MatchStartRequest,
-    MatchStartResult,
+    MatchSimRequest,
+    MatchSimResult,
     ScenarioOut,
     SellResult,
     SignResult,
+    TrainRequest,
+    TrainResult,
     UserStateOut,
 )
 from app.services.onboarding import ensure_player_setup
-from app.services.play_service import PlayService
+from app.services.play_service import NotEnoughAthletes, PlayService, TimeoutLimitError
+from app.services.training_service import TrainingError, TrainingService
 from app.services.user_service import InsufficientFunds, NotFound, UserService
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -62,6 +66,7 @@ def _to_out(state: UserState, club_id: uuid.UUID | None) -> UserStateOut:
         matches_played=state.matches_played,
         matches_won=state.matches_won,
         matches_lost=state.matches_lost,
+        approved=bool(state.approved),
         lineup=Lineup(
             beach_m=lineup.get("beach_m", []),
             beach_f=lineup.get("beach_f", []),
@@ -173,6 +178,7 @@ async def get_scenario(
         tactic=scenario["tactic"],
         weather=scenario["weather"],
         cpu_names=cpu_names(scenario["name_seed"], sex, count),
+        cpu_team=cpu_team_name(scenario["name_seed"]) if kind == "indoor" else None,
         free_rerolls_left=svc.free_rerolls_left(state),
         reroll_cost=SCENARIO_REROLL_COST,
     )
@@ -199,27 +205,68 @@ async def reroll_scenario(
         tactic=scenario["tactic"],
         weather=scenario["weather"],
         cpu_names=cpu_names(scenario["name_seed"], sex, count),
+        cpu_team=cpu_team_name(scenario["name_seed"]) if kind == "indoor" else None,
         free_rerolls_left=svc.free_rerolls_left(state),
         reroll_cost=SCENARIO_REROLL_COST,
     )
 
 
-@router.post("/match/start", response_model=MatchStartResult)
-async def start_match(
-    body: MatchStartRequest, session: DbSession, user: CurrentUser
-) -> MatchStartResult:
-    """Inicia uma partida contra a CPU usando o cenário salvo. O servidor monta
-    os times, simula e já registra o resultado (autoritativo)."""
+@router.post("/match/simulate", response_model=MatchSimResult)
+async def simulate_match_ep(
+    body: MatchSimRequest, session: DbSession, user: CurrentUser
+) -> MatchSimResult:
+    """Simula a partida para reprodução (inclui pedidos de tempo). Não grava nada:
+    pode ser chamada de novo a cada pedido de tempo, mantendo o que já foi jogado."""
     uid = uuid.UUID(user.id)
     await ensure_player_setup(session, uid)
-    state, result, cpu, _ids = await PlayService(session).start_match(
-        uid, body.kind, body.sex, body.home_tactic
-    )
-    return MatchStartResult(
-        result=_result_out(result),
+    timeline = [(e.set_no, e.rally_no, e.tactic) for e in body.timeline]
+    try:
+        result, cpu = await PlayService(session).simulate(
+            uid, body.kind, body.sex, body.home_tactic, timeline
+        )
+    except NotEnoughAthletes as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except TimeoutLimitError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return MatchSimResult(result=_result_out(result), cpu=CpuInfoOut(**cpu))
+
+
+@router.post("/match/finish", response_model=MatchFinishResult)
+async def finish_match_ep(
+    body: MatchSimRequest, session: DbSession, user: CurrentUser
+) -> MatchFinishResult:
+    """Conclui a partida: re-simula com o mesmo seed/linha do tempo e registra o
+    resultado uma única vez (stats, nível, fadiga/lesão, ouro, reputação)."""
+    uid = uuid.UUID(user.id)
+    await ensure_player_setup(session, uid)
+    timeline = [(e.set_no, e.rally_no, e.tactic) for e in body.timeline]
+    try:
+        state, _result, cpu = await PlayService(session).finish(
+            uid, body.kind, body.sex, body.home_tactic, timeline
+        )
+    except NotEnoughAthletes as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except TimeoutLimitError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return MatchFinishResult(
         cpu=CpuInfoOut(**cpu),
         state=_to_out(state, await _club_id(session, uid)),
     )
+
+
+@router.post("/train", response_model=TrainResult)
+async def train_athlete(
+    body: TrainRequest, session: DbSession, user: CurrentUser
+) -> TrainResult:
+    """Treina um atleta do elenco (1 treino por dia por atleta)."""
+    uid = uuid.UUID(user.id)
+    try:
+        athlete = await TrainingService(session).train(uid, body.athlete_id, body.training)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TrainingError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return TrainResult(athlete=AthleteOut.model_validate(athlete))
 
 
 @router.post("/sign-custom", response_model=SignResult)

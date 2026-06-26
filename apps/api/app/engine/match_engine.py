@@ -208,6 +208,23 @@ def _set_target(modality: Modality, set_no: int, sets_to_win: int, decider: bool
     return 15 if decider else 25
 
 
+def _resolve_home_tactic(
+    timeline: list[tuple[int, int, Tactic]], initial: Tactic, set_no: int, rally_no: int
+) -> Tactic:
+    """Tática do mandante neste rally, considerando os pedidos de tempo.
+
+    `timeline` é uma lista ordenada de (set, rally, tática): a partir daquele
+    rally daquele set, o mandante passa a jogar com a nova tática.
+    """
+    active = initial
+    for s, r, tac in timeline:
+        if (s, r) <= (set_no, rally_no):
+            active = tac
+        else:
+            break
+    return active
+
+
 def _play_set(
     rng: random.Random,
     home: TeamUnit,
@@ -215,6 +232,8 @@ def _play_set(
     ctx: MatchContext,
     set_no: int,
     decider: bool,
+    home_initial: Tactic,
+    timeline: list[tuple[int, int, Tactic]],
 ) -> tuple[SetScore, list[MatchEvent], str]:
     target = _set_target(ctx.modality, set_no, 0, decider)
     h = a = rally = 0
@@ -228,6 +247,8 @@ def _play_set(
                                  "As equipes trocam de lado da quadra."))
     while True:
         rally += 1
+        # Aplica a tática vigente do mandante (muda com pedidos de tempo).
+        home.tactic = _resolve_home_tactic(timeline, home_initial, set_no, rally)
         serving = home if serving_side == "home" else away
         receiving = away if serving_side == "home" else home
         scorer, rally_events = _play_rally(
@@ -259,11 +280,24 @@ def _play_set(
     return SetScore(set_no, h, a), events, winner
 
 
-def simulate_match(home: TeamUnit, away: TeamUnit, ctx: MatchContext) -> MatchResult:
-    """Simula a partida inteira de forma determinística."""
+def simulate_match(
+    home: TeamUnit,
+    away: TeamUnit,
+    ctx: MatchContext,
+    timeline: list[tuple[int, int, Tactic]] | None = None,
+) -> MatchResult:
+    """Simula a partida inteira de forma determinística.
+
+    `timeline` (pedidos de tempo): lista de (set, rally, tática) a partir da qual
+    o mandante muda de tática. Como o prefixo (antes da troca) consome o RNG de
+    forma idêntica, re-simular com um novo pedido de tempo mantém tudo que já foi
+    jogado e só altera o restante — perfeito para o cliente "emendar" a narração.
+    """
     rng = random.Random(ctx.seed)
     sets_to_win = 2 if ctx.modality.is_beach else 3
     max_sets = sets_to_win * 2 - 1
+    initial = home.tactic
+    tl = sorted(timeline or [])
 
     home_sets = away_sets = 0
     set_scores: list[SetScore] = []
@@ -274,7 +308,7 @@ def simulate_match(home: TeamUnit, away: TeamUnit, ctx: MatchContext) -> MatchRe
 
     for set_no in range(1, max_sets + 1):
         decider = (set_no == max_sets)
-        score, events, winner = _play_set(rng, home, away, ctx, set_no, decider)
+        score, events, winner = _play_set(rng, home, away, ctx, set_no, decider, initial, tl)
         set_scores.append(score)
         all_events.extend(events)
         if winner == "home":

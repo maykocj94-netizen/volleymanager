@@ -1,14 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield } from "lucide-react";
+import {
+  Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield,
+  Check, X, Tag, UserPlus, RotateCw, Hourglass,
+} from "lucide-react";
 import {
   ATTRIBUTE_LABEL,
+  BeachPosition,
+  CourtPosition,
   Modality,
   POSITION_LABEL,
+  Sex,
   SEX_LABEL,
   type AdminUser,
   type Athlete,
   type AthleteAttributes,
+  type HireListing,
 } from "@volley/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,18 +23,28 @@ import { cn } from "@/lib/utils";
 import {
   clearAdminToken,
   useAdminAddAthlete,
+  useAdminApproveUser,
   useAdminAthletes,
   useAdminCoins,
+  useAdminCreateListing,
+  useAdminDeleteListing,
+  useAdminListings,
   useAdminPatchAthlete,
   useAdminRemoveAthlete,
+  useAdminRepublishListing,
+  useAdminResolveSale,
+  useAdminSales,
   useAdminUsers,
 } from "@/lib/admin";
 
+type Tab = "contas" | "vendas" | "anuncios";
+
 export function AdminPanel() {
   const navigate = useNavigate();
-  const { data: users, isLoading, isError } = useAdminUsers();
-  const [selId, setSelId] = useState<string | null>(null);
-  const selected = users?.find((u) => u.user_id === selId) ?? users?.[0] ?? null;
+  const [tab, setTab] = useState<Tab>("contas");
+  const { data: sales } = useAdminSales();
+  const { data: users } = useAdminUsers();
+  const pendingUsers = (users ?? []).filter((u) => !u.approved).length;
 
   function logout() {
     clearAdminToken();
@@ -41,7 +58,7 @@ export function AdminPanel() {
           <Shield className="h-7 w-7 text-brand" />
           <div>
             <h1 className="text-2xl font-bold">Central de Contas</h1>
-            <p className="text-sm text-ink-muted">Painel do dono — gerencie usuários e elencos.</p>
+            <p className="text-sm text-ink-muted">Painel do dono — contas, vendas e contratações.</p>
           </div>
         </div>
         <Button variant="outline" onClick={logout}>
@@ -49,39 +66,55 @@ export function AdminPanel() {
         </Button>
       </header>
 
-      {isError && (
-        <Card className="text-red-400">
-          Não foi possível carregar (token inválido ou API offline). Faça login como dono novamente.
-        </Card>
-      )}
-      {isLoading && <Spinner />}
+      <div className="mb-5 flex flex-wrap gap-2">
+        <TabBtn active={tab === "contas"} onClick={() => setTab("contas")} badge={pendingUsers}>
+          <Shield className="h-4 w-4" /> Contas
+        </TabBtn>
+        <TabBtn active={tab === "vendas"} onClick={() => setTab("vendas")} badge={sales?.length ?? 0}>
+          <Tag className="h-4 w-4" /> Vendas
+        </TabBtn>
+        <TabBtn active={tab === "anuncios"} onClick={() => setTab("anuncios")}>
+          <UserPlus className="h-4 w-4" /> Anúncios
+        </TabBtn>
+      </div>
 
-      {users && (
-        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-          {/* Lista de usuários */}
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-ink-faint">
-              Usuários ({users.length})
-            </p>
-            {users.map((u) => (
-              <UserRow
-                key={u.user_id}
-                user={u}
-                active={selected?.user_id === u.user_id}
-                onClick={() => setSelId(u.user_id)}
-              />
-            ))}
-            {users.length === 0 && <p className="text-sm text-ink-muted">Nenhum usuário ainda.</p>}
-          </div>
+      {tab === "contas" && <AccountsPanel />}
+      {tab === "vendas" && <SalesPanel />}
+      {tab === "anuncios" && <ListingsPanel />}
+    </div>
+  );
+}
 
-          {/* Detalhe do usuário selecionado */}
-          {selected ? (
-            <UserDetail user={selected} />
-          ) : (
-            <Card className="text-ink-muted">Selecione um usuário.</Card>
-          )}
-        </div>
-      )}
+// ====================== CONTAS ======================
+function AccountsPanel() {
+  const { data: users, isLoading, isError } = useAdminUsers();
+  const [selId, setSelId] = useState<string | null>(null);
+  const selected = users?.find((u) => u.user_id === selId) ?? users?.[0] ?? null;
+
+  if (isError) {
+    return (
+      <Card className="text-red-400">
+        Não foi possível carregar (token inválido ou API offline). Faça login como dono novamente.
+      </Card>
+    );
+  }
+  if (isLoading) return <Spinner />;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-wide text-ink-faint">Usuários ({users?.length ?? 0})</p>
+        {users?.map((u) => (
+          <UserRow
+            key={u.user_id}
+            user={u}
+            active={selected?.user_id === u.user_id}
+            onClick={() => setSelId(u.user_id)}
+          />
+        ))}
+        {users?.length === 0 && <p className="text-sm text-ink-muted">Nenhum usuário ainda.</p>}
+      </div>
+      {selected ? <UserDetail user={selected} /> : <Card className="text-ink-muted">Selecione um usuário.</Card>}
     </div>
   );
 }
@@ -92,12 +125,17 @@ function UserRow({ user, active, onClick }: { user: AdminUser; active: boolean; 
       onClick={onClick}
       className={cn(
         "w-full rounded-lg border p-3 text-left transition-colors",
-        active
-          ? "border-brand bg-graphite-light"
-          : "border-graphite-border bg-surface hover:bg-graphite-light",
+        active ? "border-brand bg-graphite-light" : "border-graphite-border bg-surface hover:bg-graphite-light",
       )}
     >
-      <p className="font-semibold">{user.club_name ?? "(sem clube)"}</p>
+      <p className="flex items-center gap-2 font-semibold">
+        {user.club_name ?? "(sem clube)"}
+        {!user.approved && (
+          <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-400">
+            pendente
+          </span>
+        )}
+      </p>
       <p className="truncate text-xs text-ink-faint">{user.user_id}</p>
       <div className="mt-1 flex gap-3 text-xs text-ink-muted">
         <span>🥈 {user.silver}</span>
@@ -112,6 +150,7 @@ function UserRow({ user, active, onClick }: { user: AdminUser; active: boolean; 
 function UserDetail({ user }: { user: AdminUser }) {
   const { data: athletes, isLoading } = useAdminAthletes(user.user_id);
   const coins = useAdminCoins();
+  const approve = useAdminApproveUser();
   const addAthlete = useAdminAddAthlete(user.user_id);
   const [mod, setMod] = useState<Modality>(Modality.BEACH_M);
   const [silverDelta, setSilverDelta] = useState(1000);
@@ -119,28 +158,40 @@ function UserDetail({ user }: { user: AdminUser }) {
 
   return (
     <div className="space-y-4">
+      {/* Aprovação de entrada */}
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold">Aprovação de entrada</p>
+          <p className="text-sm text-ink-muted">
+            {user.approved ? "Conta liberada para jogar." : "Conta aguardando liberação do dono."}
+          </p>
+        </div>
+        <Button
+          variant={user.approved ? "outline" : "default"}
+          onClick={() => approve.mutate({ userId: user.user_id, approved: !user.approved })}
+          disabled={approve.isPending}
+        >
+          {user.approved ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+          {user.approved ? "Revogar acesso" : "Aprovar entrada"}
+        </Button>
+      </Card>
+
       {/* Moedas */}
       <Card>
         <div className="mb-3 flex items-center gap-2">
           <Coins className="h-5 w-5 text-brand" />
           <h2 className="font-semibold">Moedas — {user.club_name}</h2>
-          <span className="ml-auto text-sm text-ink-muted">
-            🥈 {user.silver} · 🥇 {user.gold}
-          </span>
+          <span className="ml-auto text-sm text-ink-muted">🥈 {user.silver} · 🥇 {user.gold}</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <CoinControl
-            label="Prata"
-            value={silverDelta}
-            onChange={setSilverDelta}
+            label="Prata" value={silverDelta} onChange={setSilverDelta}
             onAdd={() => coins.mutate({ userId: user.user_id, silver_delta: silverDelta, gold_delta: 0 })}
             onSub={() => coins.mutate({ userId: user.user_id, silver_delta: -silverDelta, gold_delta: 0 })}
             busy={coins.isPending}
           />
           <CoinControl
-            label="Ouro"
-            value={goldDelta}
-            onChange={setGoldDelta}
+            label="Ouro" value={goldDelta} onChange={setGoldDelta}
             onAdd={() => coins.mutate({ userId: user.user_id, silver_delta: 0, gold_delta: goldDelta })}
             onSub={() => coins.mutate({ userId: user.user_id, silver_delta: 0, gold_delta: -goldDelta })}
             busy={coins.isPending}
@@ -183,43 +234,240 @@ function UserDetail({ user }: { user: AdminUser }) {
   );
 }
 
+// ====================== VENDAS ======================
+function SalesPanel() {
+  const { data: sales, isLoading } = useAdminSales();
+  const resolve = useAdminResolveSale();
+
+  if (isLoading) return <Spinner />;
+  if (!sales?.length) return <Card className="text-ink-muted">Nenhuma venda pendente.</Card>;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-wide text-ink-faint">Vendas pendentes ({sales.length})</p>
+      {sales.map((s) => (
+        <Card key={s.id} className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold">{s.athlete_name} <span className="text-xs text-ink-faint">· CA {s.current_ability}</span></p>
+            <p className="text-xs text-ink-muted">Preço pedido: 🥈 {s.price.toLocaleString("pt-BR")} · vendedor {s.seller_id.slice(0, 8)}…</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => resolve.mutate({ id: s.id, approve: true })} disabled={resolve.isPending}>
+              <Check className="h-4 w-4" /> Confirmar venda
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => resolve.mutate({ id: s.id, approve: false })} disabled={resolve.isPending}>
+              <X className="h-4 w-4" /> Recusar
+            </Button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ====================== ANÚNCIOS (criação personalizada) ======================
+function ListingsPanel() {
+  const { data: listings, isLoading } = useAdminListings();
+  const republish = useAdminRepublishListing();
+  const del = useAdminDeleteListing();
+
+  return (
+    <div className="space-y-5">
+      <ListingForm />
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-wide text-ink-faint">
+          Anúncios ({listings?.length ?? 0})
+        </p>
+        {isLoading ? (
+          <Spinner />
+        ) : !listings?.length ? (
+          <Card className="text-ink-muted">Nenhum anúncio criado ainda.</Card>
+        ) : (
+          <div className="space-y-2">
+            {listings.map((li) => (
+              <Card key={li.id} className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 font-semibold">
+                    {li.first_name} {li.last_name}
+                    <StatusBadge status={li.status} />
+                  </p>
+                  <p className="text-xs text-ink-muted">
+                    {li.beach_position ? "🏖️ Praia" : "🏐 Quadra"} · {SEX_LABEL[li.sex]} · CA {li.current_ability} ·
+                    🥈 {li.price.toLocaleString("pt-BR")} · validade {li.availability_days}d
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {li.status !== "published" && (
+                    <Button size="sm" onClick={() => republish.mutate(li.id)} disabled={republish.isPending}>
+                      <RotateCw className="h-4 w-4" /> Republicar
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => del.mutate(li.id)} disabled={del.isPending}>
+                    <Trash2 className="h-4 w-4 text-red-400" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: HireListing["status"] }) {
+  const map: Record<string, { label: string; cls: string; icon?: boolean }> = {
+    published: { label: "publicado", cls: "bg-emerald-500/20 text-emerald-400" },
+    hired: { label: "contratado", cls: "bg-sky-500/20 text-sky-300" },
+    expired: { label: "contrato expirado", cls: "bg-amber-500/20 text-amber-400", icon: true },
+  };
+  const m = map[status] ?? map.published;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${m.cls}`}>
+      {m.icon && <Hourglass className="h-3 w-3" />}
+      {m.label}
+    </span>
+  );
+}
+
+const ATTR_KEYS = Object.keys(ATTRIBUTE_LABEL) as (keyof AthleteAttributes)[];
+
+function ListingForm() {
+  const create = useAdminCreateListing();
+  const [open, setOpen] = useState(true);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [sex, setSex] = useState<Sex>(Sex.MALE);
+  const [discipline, setDiscipline] = useState<"beach" | "indoor">("beach");
+  const [beachPos, setBeachPos] = useState<BeachPosition>(BeachPosition.UNIVERSAL);
+  const [courtPos, setCourtPos] = useState<CourtPosition>(CourtPosition.OUTSIDE);
+  const [price, setPrice] = useState(1000);
+  const [days, setDays] = useState(30);
+  const [attrs, setAttrs] = useState<Record<string, number>>(() =>
+    ATTR_KEYS.reduce((acc, k) => ({ ...acc, [k]: 65 }), {}),
+  );
+
+  function submit() {
+    const modality =
+      discipline === "beach"
+        ? sex === Sex.MALE ? Modality.BEACH_M : Modality.BEACH_F
+        : sex === Sex.MALE ? Modality.INDOOR_M : Modality.INDOOR_F;
+    create.mutate(
+      {
+        first_name: firstName.trim() || "Atleta",
+        last_name: lastName.trim() || "Publicado",
+        country: "BRA",
+        sex,
+        modality,
+        beach_position: discipline === "beach" ? beachPos : null,
+        court_position: discipline === "indoor" ? courtPos : null,
+        height_cm: 190,
+        weight_kg: 85,
+        attributes: attrs,
+        price,
+        availability_days: days,
+      },
+      { onSuccess: () => { setFirstName(""); setLastName(""); } },
+    );
+  }
+
+  return (
+    <Card>
+      <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
+        <div>
+          <p className="flex items-center gap-2 font-semibold"><Plus className="h-5 w-5 text-brand" /> Criar atleta para contratação</p>
+          <p className="text-sm text-ink-muted">Defina atributos, preço e validade. Ele entra em Contratações para todos.</p>
+        </div>
+        <span className="text-ink-muted">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Nome"><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="input" placeholder="Nome" /></Field>
+            <Field label="Sobrenome"><input value={lastName} onChange={(e) => setLastName(e.target.value)} className="input" placeholder="Sobrenome" /></Field>
+            <Field label="Sexo">
+              <select value={sex} onChange={(e) => setSex(e.target.value as Sex)} className="input">
+                <option value={Sex.MALE}>{SEX_LABEL.male}</option>
+                <option value={Sex.FEMALE}>{SEX_LABEL.female}</option>
+              </select>
+            </Field>
+            <Field label="Disciplina">
+              <select value={discipline} onChange={(e) => setDiscipline(e.target.value as "beach" | "indoor")} className="input">
+                <option value="beach">Praia</option>
+                <option value="indoor">Quadra</option>
+              </select>
+            </Field>
+            <Field label="Posição">
+              {discipline === "beach" ? (
+                <select value={beachPos} onChange={(e) => setBeachPos(e.target.value as BeachPosition)} className="input">
+                  {Object.values(BeachPosition).map((p) => <option key={p} value={p}>{POSITION_LABEL[p] ?? p}</option>)}
+                </select>
+              ) : (
+                <select value={courtPos} onChange={(e) => setCourtPos(e.target.value as CourtPosition)} className="input">
+                  {Object.values(CourtPosition).map((p) => <option key={p} value={p}>{POSITION_LABEL[p] ?? p}</option>)}
+                </select>
+              )}
+            </Field>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Preço (prata)">
+              <input type="number" min={0} value={price} onChange={(e) => setPrice(Math.max(0, Number(e.target.value)))} className="input" />
+            </Field>
+            <Field label="Validade após contratar (dias reais)">
+              <input type="number" min={1} value={days} onChange={(e) => setDays(Math.max(1, Number(e.target.value)))} className="input" />
+            </Field>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm text-ink-muted">Atributos (1–99)</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {ATTR_KEYS.map((k) => (
+                <label key={k} className="flex items-center justify-between gap-2 rounded bg-graphite px-2 py-1 text-xs">
+                  <span className="text-ink-muted">{ATTRIBUTE_LABEL[k]}</span>
+                  <input
+                    type="number" min={1} max={99} value={attrs[k]}
+                    onChange={(e) => setAttrs((s) => ({ ...s, [k]: Math.max(1, Math.min(99, Number(e.target.value) || 1)) }))}
+                    className="w-14 rounded border border-graphite-border bg-surface px-1 py-0.5 text-center text-ink"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button onClick={submit} disabled={create.isPending}>
+              {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Publicar anúncio
+            </Button>
+            {create.isSuccess && <span className="text-sm text-emerald-400">Anúncio publicado!</span>}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ====================== compartilhados ======================
 function CoinControl({
-  label,
-  value,
-  onChange,
-  onAdd,
-  onSub,
-  busy,
+  label, value, onChange, onAdd, onSub, busy,
 }: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  onAdd: () => void;
-  onSub: () => void;
-  busy: boolean;
+  label: string; value: number; onChange: (v: number) => void;
+  onAdd: () => void; onSub: () => void; busy: boolean;
 }) {
   return (
     <div className="flex items-end gap-2">
       <label className="flex flex-1 flex-col gap-1 text-sm">
         <span className="text-ink-muted">{label} (quantidade)</span>
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="h-9 rounded-lg border border-graphite-border bg-graphite px-2 text-ink"
-        />
+        <input type="number" value={value} onChange={(e) => onChange(Number(e.target.value))}
+          className="h-9 rounded-lg border border-graphite-border bg-graphite px-2 text-ink" />
       </label>
-      <Button size="sm" variant="subtle" onClick={onAdd} disabled={busy}>
-        + Adicionar
-      </Button>
-      <Button size="sm" variant="outline" onClick={onSub} disabled={busy}>
-        − Remover
-      </Button>
+      <Button size="sm" variant="subtle" onClick={onAdd} disabled={busy}>+ Adicionar</Button>
+      <Button size="sm" variant="outline" onClick={onSub} disabled={busy}>− Remover</Button>
     </div>
   );
 }
-
-const ATTR_KEYS = Object.keys(ATTRIBUTE_LABEL) as (keyof AthleteAttributes)[];
 
 function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string }) {
   const patch = useAdminPatchAthlete(userId);
@@ -227,16 +475,11 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
   const [open, setOpen] = useState(false);
   const [ca, setCa] = useState(athlete.current_ability);
   const [pa, setPa] = useState(athlete.potential_ability);
-  const [attrs, setAttrs] = useState<AthleteAttributes>(
-    athlete.attributes ?? ({} as AthleteAttributes),
-  );
+  const [attrs, setAttrs] = useState<AthleteAttributes>(athlete.attributes ?? ({} as AthleteAttributes));
   const pos = athlete.beach_position ?? athlete.court_position ?? "";
 
   function save() {
-    patch.mutate({
-      athleteId: athlete.id,
-      body: { current_ability: ca, potential_ability: pa, attributes: attrs },
-    });
+    patch.mutate({ athleteId: athlete.id, body: { current_ability: ca, potential_ability: pa, attributes: attrs } });
     setOpen(false);
   }
 
@@ -246,17 +489,11 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">
             {athlete.first_name} {athlete.last_name}{" "}
-            <span className="text-xs text-ink-faint">
-              · {SEX_LABEL[athlete.sex]} · {POSITION_LABEL[pos] ?? pos}
-            </span>
+            <span className="text-xs text-ink-faint">· {SEX_LABEL[athlete.sex]} · {POSITION_LABEL[pos] ?? pos}</span>
           </p>
-          <p className="text-xs text-ink-muted">
-            CA {athlete.current_ability} · PA {athlete.potential_ability}
-          </p>
+          <p className="text-xs text-ink-muted">CA {athlete.current_ability} · PA {athlete.potential_ability} · LVL {athlete.level}</p>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
-          <Pencil className="h-4 w-4" /> Editar
-        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}><Pencil className="h-4 w-4" /> Editar</Button>
         <Button size="sm" variant="ghost" onClick={() => remove.mutate(athlete.id)} disabled={remove.isPending}>
           <Trash2 className="h-4 w-4 text-red-400" />
         </Button>
@@ -270,18 +507,13 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {ATTR_KEYS.map((k) => (
-              <NumField
-                key={k}
-                label={ATTRIBUTE_LABEL[k]}
-                value={(attrs[k] as number) ?? 0}
-                onChange={(v) => setAttrs((s) => ({ ...s, [k]: v }))}
-              />
+              <NumField key={k} label={ATTRIBUTE_LABEL[k]} value={(attrs[k] as number) ?? 0}
+                onChange={(v) => setAttrs((s) => ({ ...s, [k]: v }))} />
             ))}
           </div>
           <div className="mt-3">
             <Button size="sm" onClick={save} disabled={patch.isPending}>
-              {patch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar
+              {patch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
             </Button>
           </div>
         </div>
@@ -290,27 +522,44 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
   );
 }
 
-function NumField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-}) {
+function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <label className="flex flex-col gap-1 text-xs">
       <span className="truncate text-ink-faint">{label}</span>
-      <input
-        type="number"
-        min={0}
-        max={100}
-        value={value}
+      <input type="number" min={0} max={100} value={value}
         onChange={(e) => onChange(Math.max(0, Math.min(100, Number(e.target.value))))}
-        className="h-8 rounded border border-graphite-border bg-graphite px-2 text-sm text-ink"
-      />
+        className="h-8 rounded border border-graphite-border bg-graphite px-2 text-sm text-ink" />
     </label>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="text-ink-muted">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function TabBtn({
+  active, onClick, badge, children,
+}: {
+  active: boolean; onClick: () => void; badge?: number; children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+        active ? "bg-brand text-black" : "bg-graphite text-ink-muted hover:text-ink",
+      )}
+    >
+      {children}
+      {!!badge && badge > 0 && (
+        <span className="ml-1 rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">{badge}</span>
+      )}
+    </button>
   );
 }
 

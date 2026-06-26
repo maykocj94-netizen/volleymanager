@@ -61,8 +61,23 @@ def roll_scenario(seed: int | None = None) -> dict:
     }
 
 
+# Nomes de time inventados para a CPU de quadra (PT e EN), em vez de 6 nomes.
+_TEAM_NAMES = [
+    "Os Imortais", "Os Titãs", "Fúria do Litoral", "Vendaval", "Tubarões da Areia",
+    "Os Invencíveis", "Leões do Saque", "Trovão Azul", "Os Gladiadores", "Falcões de Aço",
+    "Dragões da Rede", "Os Predadores", "Tempestade", "Os Bárbaros", "Lobos do Mar",
+    "The Crows", "The Sharks", "Iron Wolves", "Thunder Six", "Black Eagles",
+    "Sandstorm", "The Spikers", "Phoenix VC", "Nitro Squad", "Vipers",
+]
+
+
 def difficulty_label(tier: str) -> str:
     return TIER_LABEL.get(tier, "Médio")
+
+
+def cpu_team_name(name_seed: int) -> str:
+    """Nome de time inventado para a CPU de quadra, estável por `name_seed`."""
+    return random.Random(f"{name_seed}-team").choice(_TEAM_NAMES)
 
 
 def cpu_names(name_seed: int, sex: Sex, count: int) -> list[str]:

@@ -1,33 +1,26 @@
 import { useState } from "react";
-import { Loader2, Tag, UserPlus, Plus } from "lucide-react";
+import { Loader2, Tag, UserPlus, Hourglass, X } from "lucide-react";
 import {
-  ATTRIBUTE_LABEL,
-  BeachPosition,
-  CourtPosition,
-  Modality,
   POSITION_LABEL,
-  Sex,
   SEX_LABEL,
-  type AthleteAttributes,
-  type CustomAthleteCreate,
+  type HireListing,
 } from "@volley/shared";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { useClubAthletes, useMe, useMyClub } from "@/lib/game";
 import {
-  useClubAthletes,
-  useCreateCustom,
-  useCustomAthletes,
-  useMe,
-  useMyClub,
-  useSellAthlete,
-  useSignCustom,
-} from "@/lib/game";
+  useCancelSale,
+  useHireListing,
+  useListForSale,
+  useListings,
+  useMySales,
+} from "@/lib/market";
 import { AthleteCard } from "@/features/squad/AthleteCard";
 
-type Tab = "sell" | "hire";
+type Tab = "hire" | "sell";
 
 export function MarketPage() {
-  const [tab, setTab] = useState<Tab>("sell");
+  const [tab, setTab] = useState<Tab>("hire");
   const { club, isError } = useMyClub();
 
   if (isError) {
@@ -43,302 +36,180 @@ export function MarketPage() {
       <header>
         <h1 className="text-2xl font-bold">Mercado de Transferências</h1>
         <p className="text-sm text-ink-muted">
-          Venda atletas (valor varia com o desempenho) ou contrate atletas personalizados.
+          Contrate atletas publicados pelo administrador ou coloque seus atletas à venda
+          (a venda passa pela aprovação do dono).
         </p>
       </header>
 
       <div className="flex gap-2">
-        <TabButton active={tab === "sell"} onClick={() => setTab("sell")}>
-          <Tag className="h-4 w-4" /> Vendas
-        </TabButton>
         <TabButton active={tab === "hire"} onClick={() => setTab("hire")}>
           <UserPlus className="h-4 w-4" /> Contratações
         </TabButton>
+        <TabButton active={tab === "sell"} onClick={() => setTab("sell")}>
+          <Tag className="h-4 w-4" /> Vender
+        </TabButton>
       </div>
 
-      {tab === "sell" ? <SellTab clubId={club?.id} /> : <HireTab clubId={club?.id} />}
+      {tab === "hire" ? <HireTab clubId={club?.id} /> : <SellTab clubId={club?.id} />}
     </div>
   );
 }
 
+// --- Contratações (anúncios publicados pelo dono) ---
+function HireTab({ clubId }: { clubId: string | undefined }) {
+  const { data: listings, isLoading } = useListings();
+  const { data: me } = useMe();
+  const hire = useHireListing(clubId);
+
+  if (isLoading) return <Spinner />;
+
+  return (
+    <div className="space-y-4">
+      {hire.isSuccess && (
+        <p className="text-sm text-emerald-400">
+          Contratado: {hire.data.athlete.first_name} {hire.data.athlete.last_name}!
+        </p>
+      )}
+      {hire.isError && (
+        <p className="text-sm text-red-400">
+          {String(hire.error).includes("402")
+            ? "Prata insuficiente para contratar."
+            : "Anúncio indisponível (já foi contratado)."}
+        </p>
+      )}
+      {!listings?.length ? (
+        <Card className="text-ink-muted">
+          Nenhum atleta disponível para contratação no momento.
+        </Card>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {listings.map((li) => {
+            const canAfford = !!me && me.silver >= li.price;
+            return (
+              <ListingCard
+                key={li.id}
+                listing={li}
+                footer={
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() => hire.mutate(li.id)}
+                    disabled={hire.isPending || !canAfford}
+                    title={canAfford ? "" : "Prata insuficiente"}
+                  >
+                    <UserPlus className="h-4 w-4" /> Contratar por{" "}
+                    {li.price.toLocaleString("pt-BR")}
+                  </Button>
+                }
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListingCard({ listing, footer }: { listing: HireListing; footer: React.ReactNode }) {
+  const pos = listing.beach_position ?? listing.court_position ?? "";
+  const beach = !!listing.beach_position;
+  return (
+    <div className="card p-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-semibold leading-tight">
+            {listing.first_name} {listing.last_name}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+            <span
+              className={`rounded px-1.5 py-0.5 font-bold uppercase ${
+                beach ? "bg-amber-500/20 text-amber-400" : "bg-indigo-500/20 text-indigo-300"
+              }`}
+            >
+              {beach ? "🏖️ Praia" : "🏐 Quadra"}
+            </span>
+            <span className="text-ink-muted">
+              {POSITION_LABEL[pos] ?? pos} · {SEX_LABEL[listing.sex]}
+            </span>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-black tabular-nums text-brand">{listing.current_ability}</p>
+          <p className="text-[10px] uppercase text-ink-faint">pot {listing.potential_ability}</p>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-ink-faint">
+        ⏳ Validade após contratar: <b className="text-ink-muted">{listing.availability_days} dias</b>
+      </p>
+      <div className="mt-3 border-t border-graphite-border pt-3">{footer}</div>
+    </div>
+  );
+}
+
+// --- Vender (com aprovação do dono) ---
 function SellTab({ clubId }: { clubId: string | undefined }) {
   const { data: athletes, isLoading } = useClubAthletes(clubId);
-  const sell = useSellAthlete(clubId);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const { data: sales } = useMySales();
+  const list = useListForSale(clubId);
+  const cancel = useCancelSale(clubId);
 
   if (isLoading) return <Spinner />;
   if (!athletes?.length) return <Card className="text-ink-muted">Elenco vazio.</Card>;
 
+  const pendingByAthlete = new Map((sales ?? []).map((s) => [s.athlete_id, s]));
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-ink-muted">
-        💡 Cada <b className="text-emerald-400">vitória</b> valoriza o atleta; cada{" "}
-        <b className="text-red-400">derrota</b> desvaloriza. O valor abaixo já reflete o histórico.
+        💡 Ao colocar à venda, o pedido vai para o <b className="text-brand">painel do dono</b>,
+        que confirma ou recusa. A prata só é creditada após a aprovação.
       </p>
-      {sell.isSuccess && (
+      {list.isSuccess && (
         <p className="text-sm text-emerald-400">
-          Atleta vendido por {sell.data.value.toLocaleString("pt-BR")} de prata!
+          Atleta anunciado! Aguardando aprovação do dono.
         </p>
       )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {athletes.map((a) => (
-          <AthleteCard
-            key={a.id}
-            athlete={a}
-            footer={
-              confirmId === a.id ? (
-                <div className="flex items-center gap-2">
+        {athletes.map((a) => {
+          const pending = pendingByAthlete.get(a.id) ?? (a.for_sale ? { id: "" } : null);
+          return (
+            <AthleteCard
+              key={a.id}
+              athlete={a}
+              footer={
+                pending ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1 text-xs text-amber-400">
+                      <Hourglass className="h-3.5 w-3.5" /> Aguardando aprovação
+                    </span>
+                    {pending.id && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => cancel.mutate(pending.id)}
+                        disabled={cancel.isPending}
+                      >
+                        <X className="h-4 w-4" /> Cancelar
+                      </Button>
+                    )}
+                  </div>
+                ) : (
                   <Button
                     size="sm"
-                    onClick={() => {
-                      sell.mutate(a.id);
-                      setConfirmId(null);
-                    }}
-                    disabled={sell.isPending}
+                    variant="subtle"
+                    className="w-full"
+                    onClick={() => list.mutate(a.id)}
+                    disabled={list.isPending}
                   >
-                    Confirmar venda
+                    <Tag className="h-4 w-4" /> Colocar à venda ({a.sale_value.toLocaleString("pt-BR")})
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmId(null)}>
-                    Cancelar
-                  </Button>
-                </div>
-              ) : (
-                <Button size="sm" variant="subtle" className="w-full" onClick={() => setConfirmId(a.id)}>
-                  <Tag className="h-4 w-4" /> Vender por {a.sale_value.toLocaleString("pt-BR")}
-                </Button>
-              )
-            }
-          />
-        ))}
+                )
+              }
+            />
+          );
+        })}
       </div>
     </div>
-  );
-}
-
-function HireTab({ clubId }: { clubId: string | undefined }) {
-  const { data: customs, isLoading } = useCustomAthletes();
-  const { data: me } = useMe();
-  const sign = useSignCustom(clubId);
-
-  return (
-    <div className="space-y-6">
-      <CustomAthleteForm />
-
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">Disponíveis para contratar</h2>
-        {sign.isSuccess && (
-          <p className="mb-3 text-sm text-emerald-400">
-            Contratado: {sign.data.athlete.first_name} {sign.data.athlete.last_name}!
-          </p>
-        )}
-        {sign.isError && (
-          <p className="mb-3 text-sm text-red-400">Prata insuficiente para contratar.</p>
-        )}
-        {isLoading ? (
-          <Spinner />
-        ) : !customs?.length ? (
-          <Card className="text-ink-muted">
-            Nenhum atleta personalizado ainda. Crie um acima — ele aparecerá aqui para contratação.
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {customs.map((a) => {
-              const canAfford = !!me && me.silver >= a.market_value;
-              return (
-                <AthleteCard
-                  key={a.id}
-                  athlete={a}
-                  footer={
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      onClick={() => sign.mutate(a.id)}
-                      disabled={sign.isPending || !canAfford}
-                      title={canAfford ? "" : "Prata insuficiente"}
-                    >
-                      <UserPlus className="h-4 w-4" /> Contratar por{" "}
-                      {a.market_value.toLocaleString("pt-BR")}
-                    </Button>
-                  }
-                />
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const ATTR_KEYS = Object.keys(ATTRIBUTE_LABEL) as (keyof AthleteAttributes)[];
-
-function CustomAthleteForm() {
-  const create = useCreateCustom();
-  const [open, setOpen] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [sex, setSex] = useState<Sex>(Sex.MALE);
-  const [discipline, setDiscipline] = useState<"beach" | "indoor">("beach");
-  const [beachPos, setBeachPos] = useState<BeachPosition>(BeachPosition.UNIVERSAL);
-  const [courtPos, setCourtPos] = useState<CourtPosition>(CourtPosition.OUTSIDE);
-  const [attrs, setAttrs] = useState<AthleteAttributes>(() =>
-    ATTR_KEYS.reduce((acc, k) => ({ ...acc, [k]: 60 }), {} as AthleteAttributes),
-  );
-
-  function submit() {
-    const body: CustomAthleteCreate = {
-      first_name: firstName.trim() || "Atleta",
-      last_name: lastName.trim() || "Personalizado",
-      country: "BRA",
-      sex,
-      modality:
-        discipline === "beach"
-          ? sex === Sex.MALE
-            ? Modality.BEACH_M
-            : Modality.BEACH_F
-          : sex === Sex.MALE
-            ? Modality.INDOOR_M
-            : Modality.INDOOR_F,
-      beach_position: discipline === "beach" ? beachPos : null,
-      court_position: discipline === "indoor" ? courtPos : null,
-      height_cm: 190,
-      weight_kg: 85,
-      attributes: attrs,
-    };
-    create.mutate(body, {
-      onSuccess: () => {
-        setFirstName("");
-        setLastName("");
-      },
-    });
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <button
-          className="flex w-full items-center justify-between text-left"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-brand" /> Criar atleta personalizado
-            </CardTitle>
-            <CardDescription>
-              Defina sexo, posição e atributos. Ele entra na lista de contratações.
-            </CardDescription>
-          </div>
-          <span className="text-ink-muted">{open ? "▲" : "▼"}</span>
-        </button>
-      </CardHeader>
-
-      {open && (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Nome">
-              <input
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Nome"
-                className="input"
-              />
-            </Field>
-            <Field label="Sobrenome">
-              <input
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Sobrenome"
-                className="input"
-              />
-            </Field>
-            <Field label="Sexo">
-              <select value={sex} onChange={(e) => setSex(e.target.value as Sex)} className="input">
-                <option value={Sex.MALE}>{SEX_LABEL.male}</option>
-                <option value={Sex.FEMALE}>{SEX_LABEL.female}</option>
-              </select>
-            </Field>
-            <Field label="Disciplina">
-              <select
-                value={discipline}
-                onChange={(e) => setDiscipline(e.target.value as "beach" | "indoor")}
-                className="input"
-              >
-                <option value="beach">Praia</option>
-                <option value="indoor">Quadra</option>
-              </select>
-            </Field>
-            <Field label="Posição">
-              {discipline === "beach" ? (
-                <select
-                  value={beachPos}
-                  onChange={(e) => setBeachPos(e.target.value as BeachPosition)}
-                  className="input"
-                >
-                  {Object.values(BeachPosition).map((p) => (
-                    <option key={p} value={p}>
-                      {POSITION_LABEL[p] ?? p}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <select
-                  value={courtPos}
-                  onChange={(e) => setCourtPos(e.target.value as CourtPosition)}
-                  className="input"
-                >
-                  {Object.values(CourtPosition).map((p) => (
-                    <option key={p} value={p}>
-                      {POSITION_LABEL[p] ?? p}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </Field>
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm text-ink-muted">Atributos (1–99)</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {ATTR_KEYS.map((k) => (
-                <label key={k} className="flex items-center justify-between gap-2 rounded bg-graphite px-2 py-1 text-xs">
-                  <span className="text-ink-muted">{ATTRIBUTE_LABEL[k]}</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={attrs[k]}
-                    onChange={(e) =>
-                      setAttrs((s) => ({
-                        ...s,
-                        [k]: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
-                      }))
-                    }
-                    className="w-14 rounded border border-graphite-border bg-surface px-1 py-0.5 text-center text-ink"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button onClick={submit} disabled={create.isPending}>
-              {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Criar atleta
-            </Button>
-            {create.isSuccess && <span className="text-sm text-emerald-400">Atleta criado!</span>}
-          </div>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-ink-muted">{label}</span>
-      {children}
-    </label>
   );
 }
 

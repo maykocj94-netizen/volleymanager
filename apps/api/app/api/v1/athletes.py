@@ -38,6 +38,9 @@ async def list_club_athletes(
     session: DbSession,
     _user: CurrentUser,
 ) -> list[AthleteOut]:
+    # Remove atletas com validade expirada (contratações por anúncio) antes de listar.
+    from app.services.market_service import expire_due
+    await expire_due(session, club_id=club_id)
     service = AthleteService(AthleteRepository(session))
     athletes = await service.list_by_club(club_id)
     return [AthleteOut.model_validate(a) for a in athletes]

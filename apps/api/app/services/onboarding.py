@@ -79,4 +79,7 @@ async def ensure_player_setup(
         created = True
 
     await ensure_squads(session, club)
+    # Remove atletas cuja validade (contratação por anúncio) expirou.
+    from app.services.market_service import expire_due
+    await expire_due(session, club_id=club.id)
     return club, created

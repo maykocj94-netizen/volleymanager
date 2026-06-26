@@ -42,8 +42,38 @@ export interface Athlete {
   losses: number;
   is_custom: boolean;
   is_injured: boolean;
+  level: number;
+  level_xp: number;
+  condition: AthleteCondition;
+  rest_games_left: number;
+  injured_until: string | null;
+  last_trained_on: string | null;
+  for_sale: boolean;
+  expires_at: string | null;
   attributes: AthleteAttributes | null;
 }
+
+export type AthleteCondition = "ok" | "fatigued" | "injured";
+
+export const CONDITION_LABEL: Record<AthleteCondition, string> = {
+  ok: "Pronto",
+  fatigued: "Fadigado",
+  injured: "Lesionado",
+};
+
+/** Treinos disponíveis (1 por dia por atleta). Espelha app/engine/training.py. */
+export const TRAININGS: { key: string; label: string; hint: string }[] = [
+  { key: "saque", label: "Saque", hint: "+Saque, −Recepção" },
+  { key: "recepcao", label: "Recepção", hint: "+Recepção, −Saque" },
+  { key: "passe", label: "Passe", hint: "+Levantamento/Posicionamento, −Bloqueio" },
+  { key: "levantamento", label: "Levantamento", hint: "+Levantamento, −Resistência" },
+  { key: "manchete", label: "Manchete", hint: "+Defesa, −Ataque" },
+  { key: "ataque", label: "Ataque", hint: "+Ataque, −Defesa" },
+  { key: "cortada", label: "Cortada", hint: "+Ataque/Impulsão, −Recepção" },
+  { key: "impulsao", label: "Impulsão", hint: "+Impulsão, −Resistência" },
+  { key: "deslocamento", label: "Deslocamento", hint: "+Velocidade, −Impulsão" },
+  { key: "defesa", label: "Defesa", hint: "+Defesa/Posicionamento, −Saque" },
+];
 
 export interface Club {
   id: string;

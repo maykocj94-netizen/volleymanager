@@ -17,3 +17,9 @@ function Placeholder({ title, phase }: { title: string; phase: string }) {
 }
 
 export const CompetitionsPage = () => <Placeholder title="Competições" phase="Fase 4" />;
+export const OnlineMatchPage = () => (
+  <Placeholder title="Partida Online" phase="breve — desafie outros treinadores (vencedor ganha 5 de ouro)" />
+);
+export const StorePage = () => (
+  <Placeholder title="Loja" phase="breve — caixas de ouro, cards gatcha de jogadores e cosméticos" />
+);

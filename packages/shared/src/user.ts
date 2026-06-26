@@ -19,8 +19,42 @@ export interface UserState {
   matches_played: number;
   matches_won: number;
   matches_lost: number;
+  approved: boolean;
   lineup: Lineup;
   club_id: string | null;
+}
+
+// --- Marketplace de contratações (anúncios do dono) ---
+export interface HireListing {
+  id: string;
+  first_name: string;
+  last_name: string;
+  country: string;
+  sex: Sex;
+  modality: Modality;
+  court_position: CourtPosition | null;
+  beach_position: BeachPosition | null;
+  height_cm: number;
+  weight_kg: number;
+  attributes: Record<string, number>;
+  current_ability: number;
+  potential_ability: number;
+  price: number;
+  availability_days: number;
+  status: "published" | "hired" | "expired";
+  hired_by: string | null;
+  expires_at: string | null;
+}
+
+// --- Pedido de venda (aprovação do dono) ---
+export interface SaleRequest {
+  id: string;
+  athlete_id: string;
+  seller_id: string;
+  price: number;
+  status: string;
+  athlete_name?: string;
+  current_ability?: number;
 }
 
 export interface MatchResultReport {
@@ -69,20 +103,41 @@ export interface Scenario {
   tactic: string;
   weather: string;
   cpu_names: string[];
+  cpu_team: string | null;
   free_rerolls_left: number;
   reroll_cost: number;
 }
 
 export interface CpuInfo {
   names: string[];
+  team_name: string | null;
   tier: string;
   label: string;
   tactic: string;
   weather: string | null;
+  gold_awarded: number;
+  statuses: Record<string, string>;
 }
 
 export interface MatchStartResult {
   result: import("./match").MatchResult;
+  cpu: CpuInfo;
+  state: UserState;
+}
+
+// Pedido de tempo: a partir deste rally (deste set) o mandante muda de tática.
+export interface TimeoutEntry {
+  set_no: number;
+  rally_no: number;
+  tactic: string;
+}
+
+export interface MatchSimResult {
+  result: import("./match").MatchResult;
+  cpu: CpuInfo;
+}
+
+export interface MatchFinishResult {
   cpu: CpuInfo;
   state: UserState;
 }
@@ -99,6 +154,7 @@ export interface AdminUser {
   matches_won: number;
   matches_lost: number;
   athlete_count: number;
+  approved: boolean;
 }
 
 export interface AdminWallet {

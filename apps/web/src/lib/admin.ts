@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminUser, AdminWallet, Athlete, Modality } from "@volley/shared";
+import type {
+  AdminUser,
+  AdminWallet,
+  Athlete,
+  HireListing,
+  Modality,
+  SaleRequest,
+} from "@volley/shared";
 import { API_URL } from "./api";
 
 const ADMIN_KEY = "volley_admin_token";
@@ -41,6 +48,37 @@ export const adminAddAthlete = (userId: string, modality: Modality) =>
   });
 export const adminRemoveAthlete = (athleteId: string) =>
   adminApi<{ ok: boolean }>(`/api/v1/admin/athletes/${athleteId}`, { method: "DELETE" });
+
+// aprovação de entrada de contas
+export const adminApproveUser = (userId: string, approved: boolean) =>
+  adminApi<AdminUser>(`/api/v1/admin/users/${userId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ approved }),
+  });
+
+// vendas (aprovação do dono)
+export const adminListSales = () => adminApi<SaleRequest[]>("/api/v1/admin/sales");
+export const adminApproveSale = (id: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/sales/${id}/approve`, { method: "POST" });
+export const adminRejectSale = (id: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/sales/${id}/reject`, { method: "POST" });
+
+// anúncios de contratação (criação personalizada — só admin)
+export const adminListListings = () => adminApi<HireListing[]>("/api/v1/admin/listings");
+export const adminCreateListing = (body: Record<string, unknown>) =>
+  adminApi<HireListing>("/api/v1/admin/listings", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export const adminUpdateListing = (id: string, body: Record<string, unknown>) =>
+  adminApi<HireListing>(`/api/v1/admin/listings/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+export const adminRepublishListing = (id: string) =>
+  adminApi<HireListing>(`/api/v1/admin/listings/${id}/republish`, { method: "POST" });
+export const adminDeleteListing = (id: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/listings/${id}`, { method: "DELETE" });
 
 // --- hooks ---
 export function useAdminUsers() {
@@ -92,5 +130,58 @@ export function useAdminRemoveAthlete(userId?: string) {
       qc.invalidateQueries({ queryKey: ["admin", "athletes", userId] });
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
     },
+  });
+}
+
+export function useAdminApproveUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { userId: string; approved: boolean }) =>
+      adminApproveUser(v.userId, v.approved),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+  });
+}
+
+export function useAdminSales() {
+  return useQuery({ queryKey: ["admin", "sales"], queryFn: adminListSales });
+}
+
+export function useAdminResolveSale() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; approve: boolean }) =>
+      v.approve ? adminApproveSale(v.id) : adminRejectSale(v.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "sales"] });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
+export function useAdminListings() {
+  return useQuery({ queryKey: ["admin", "listings"], queryFn: adminListListings });
+}
+
+export function useAdminCreateListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => adminCreateListing(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
+  });
+}
+
+export function useAdminRepublishListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminRepublishListing(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
+  });
+}
+
+export function useAdminDeleteListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminDeleteListing(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
   });
 }

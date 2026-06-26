@@ -1,24 +1,28 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
   ArrowLeftRight,
   Swords,
+  Globe,
   Trophy,
+  ShoppingBag,
   CircleDot,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Wallet } from "@/components/Wallet";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import { useAuth } from "@/stores/auth";
-import { isSupabaseConfigured } from "@/lib/supabase";
 
 const nav = [
-  { to: "/", label: "Painel", icon: LayoutDashboard, end: true },
-  { to: "/elenco", label: "Elenco", icon: Users },
-  { to: "/mercado", label: "Mercado", icon: ArrowLeftRight },
-  { to: "/partida", label: "Partida", icon: Swords },
-  { to: "/competicoes", label: "Competições", icon: Trophy },
+  { to: "/", label: "Painel", short: "Painel", icon: LayoutDashboard, end: true },
+  { to: "/elenco", label: "Elenco", short: "Elenco", icon: Users },
+  { to: "/mercado", label: "Mercado", short: "Mercado", icon: ArrowLeftRight },
+  { to: "/partida", label: "Partida Single", short: "Single", icon: Swords },
+  { to: "/partida-online", label: "Partida Online", short: "Online", icon: Globe },
+  { to: "/competicoes", label: "Competições", short: "Torneios", icon: Trophy },
+  { to: "/loja", label: "Loja", short: "Loja", icon: ShoppingBag },
 ];
 
 export function AppLayout() {
@@ -46,11 +50,12 @@ export function AppLayout() {
 
       {/* Conteúdo */}
       <main className="flex-1 px-4 py-6 md:px-8 md:py-8 pb-24 md:pb-8">
+        <PwaInstallPrompt />
         <Outlet />
       </main>
 
-      {/* Bottom nav (mobile) */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-graphite-border bg-surface md:hidden">
+      {/* Bottom nav (mobile) — rolável p/ caber todos os itens + Sair */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex overflow-x-auto border-t border-graphite-border bg-surface md:hidden">
         {nav.map((item) => (
           <NavLink
             key={item.to}
@@ -58,27 +63,48 @@ export function AppLayout() {
             end={item.end}
             className={({ isActive }) =>
               cn(
-                "flex flex-1 flex-col items-center gap-1 py-2 text-[11px]",
+                "flex min-w-[64px] flex-1 flex-col items-center gap-1 py-2 text-[10px]",
                 isActive ? "text-brand" : "text-ink-muted",
               )
             }
           >
             <item.icon className="h-5 w-5" />
-            {item.label}
+            {item.short}
           </NavLink>
         ))}
+        <SignOutButton mobile />
       </nav>
     </div>
   );
 }
 
-function SignOutButton() {
-  const { user, signOut } = useAuth();
-  // Só faz sentido quando há login real (Supabase configurado e sessão ativa).
-  if (!isSupabaseConfigured || !user) return null;
+function SignOutButton({ mobile }: { mobile?: boolean }) {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  async function handle() {
+    try {
+      await signOut();
+    } catch {
+      // sem Supabase configurado — segue para a tela de login mesmo assim
+    }
+    navigate("/login", { replace: true });
+  }
+
+  if (mobile) {
+    return (
+      <button
+        onClick={handle}
+        className="flex min-w-[64px] flex-1 flex-col items-center gap-1 py-2 text-[10px] text-ink-muted"
+      >
+        <LogOut className="h-5 w-5" />
+        Sair
+      </button>
+    );
+  }
   return (
     <button
-      onClick={() => void signOut()}
+      onClick={handle}
       className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-graphite-light hover:text-ink"
     >
       <LogOut className="h-4.5 w-4.5" />

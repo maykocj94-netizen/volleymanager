@@ -19,6 +19,11 @@ class AdminUser(BaseModel):
     matches_won: int
     matches_lost: int
     athlete_count: int
+    approved: bool = True
+
+
+class ApproveRequest(BaseModel):
+    approved: bool = True
 
 
 class CoinAdjust(BaseModel):

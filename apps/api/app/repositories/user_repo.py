@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.club import Club
 from app.models.user_state import (
     STARTING_GOLD,
@@ -29,6 +30,9 @@ class UserRepository:
                 gold=STARTING_GOLD,
                 streak=0,
                 lineup={},
+                # Em dev (sem auth) a conta já entra liberada; contas reais novas
+                # ficam pendentes de aprovação do dono.
+                approved=settings.dev_no_auth,
             )
             self.session.add(state)
             await self.session.flush()

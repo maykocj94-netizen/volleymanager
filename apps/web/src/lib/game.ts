@@ -6,12 +6,14 @@ import type {
   HireResult,
   Lineup,
   LoginResult,
+  MatchFinishResult,
   MatchResultReport,
-  MatchStartResult,
+  MatchSimResult,
   Modality,
   Scenario,
   SellResult,
   SignResult,
+  TimeoutEntry,
   UserState,
 } from "@volley/shared";
 import { api } from "./api";
@@ -69,16 +71,34 @@ export const postSignCustom = (athleteId: string) =>
     body: JSON.stringify({ athlete_id: athleteId }),
   });
 
+export const postTrain = (athleteId: string, training: string) =>
+  api<{ athlete: Athlete }>("/api/v1/me/train", {
+    method: "POST",
+    body: JSON.stringify({ athlete_id: athleteId, training }),
+  });
+
 export const getScenario = (kind: MatchKind, sex: SexParam) =>
   api<Scenario>(`/api/v1/me/scenario?kind=${kind}&sex=${sex}`);
 export const postReroll = (kind: MatchKind, sex: SexParam) =>
   api<Scenario>(`/api/v1/me/scenario/reroll?kind=${kind}&sex=${sex}`, { method: "POST" });
-export const postStartMatch = (body: {
+export const postSimulateMatch = (body: {
   kind: MatchKind;
   sex: SexParam;
   home_tactic: string;
+  timeline: TimeoutEntry[];
 }) =>
-  api<MatchStartResult>("/api/v1/me/match/start", {
+  api<MatchSimResult>("/api/v1/me/match/simulate", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const postFinishMatch = (body: {
+  kind: MatchKind;
+  sex: SexParam;
+  home_tactic: string;
+  timeline: TimeoutEntry[];
+}) =>
+  api<MatchFinishResult>("/api/v1/me/match/finish", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -220,13 +240,22 @@ export function useReroll(kind: MatchKind, sex: SexParam) {
   });
 }
 
-export function useStartMatch(clubId: string | undefined) {
+export function useFinishMatch(clubId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: postStartMatch,
+    mutationFn: postFinishMatch,
     onSuccess: (res) => {
       qc.setQueryData(["me"], res.state);
       qc.invalidateQueries({ queryKey: ["athletes", "club", clubId] });
     },
+  });
+}
+
+export function useTrain(clubId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ athleteId, training }: { athleteId: string; training: string }) =>
+      postTrain(athleteId, training),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["athletes", "club", clubId] }),
   });
 }

@@ -17,6 +17,7 @@ import {
 } from "@/lib/game";
 import { AthleteCard } from "./AthleteCard";
 import { LineupEditor } from "./LineupEditor";
+import { TrainingButton } from "./TrainingButton";
 
 export function SquadPage() {
   const { club, isLoading: loadingClub, isError } = useMyClub();
@@ -154,7 +155,11 @@ export function SquadPage() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((a) => (
-              <AthleteCard key={a.id} athlete={a} />
+              <AthleteCard
+                key={a.id}
+                athlete={a}
+                footer={<TrainingButton athlete={a} clubId={club?.id} />}
+              />
             ))}
           </div>
         )}

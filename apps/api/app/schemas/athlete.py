@@ -1,7 +1,7 @@
 """Schemas Pydantic (DTOs) para atletas."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,6 +54,15 @@ class AthleteOut(BaseModel):
     losses: int
     is_custom: bool
     is_injured: bool
+    # Progressão e condição física.
+    level: int = 1
+    level_xp: int = 0
+    condition: str = "ok"            # "ok" | "fatigued" | "injured"
+    rest_games_left: int = 0
+    injured_until: datetime | None = None
+    last_trained_on: date | None = None
+    for_sale: bool = False
+    expires_at: datetime | None = None
     attributes: AttributesOut | None = None
 
 
