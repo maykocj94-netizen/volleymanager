@@ -1,7 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Limpa espaços/quebras e qualquer caractere fora do alfabeto de um JWT. Isso
+// evita o erro "headers ... non ISO-8859-1 code point" quando a variável de
+// ambiente vem com algum caractere invisível colado por engano.
+const url = (import.meta.env.VITE_SUPABASE_URL ?? "").trim();
+const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "")
+  .trim()
+  .replace(/[^A-Za-z0-9._-]/g, "");
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
