@@ -4,10 +4,10 @@ import { api } from "./api";
 
 // --- chamadas ---
 export const getListings = () => api<HireListing[]>("/api/v1/market/listings");
-export const postHireListing = (listingId: string) =>
+export const postHireListing = (listingId: string, currency: "silver" | "gold" = "silver") =>
   api<{ athlete: Athlete; state: UserState }>("/api/v1/market/hire", {
     method: "POST",
-    body: JSON.stringify({ listing_id: listingId }),
+    body: JSON.stringify({ listing_id: listingId, currency }),
   });
 export const postListForSale = (athleteId: string) =>
   api<SaleRequest>("/api/v1/market/list-for-sale", {
@@ -30,7 +30,8 @@ export function useMySales() {
 export function useHireListing(clubId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (listingId: string) => postHireListing(listingId),
+    mutationFn: (v: { listingId: string; currency: "silver" | "gold" }) =>
+      postHireListing(v.listingId, v.currency),
     onSuccess: (res) => {
       qc.setQueryData(["me"], res.state);
       qc.invalidateQueries({ queryKey: ["market", "listings"] });

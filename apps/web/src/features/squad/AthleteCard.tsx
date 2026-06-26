@@ -24,18 +24,23 @@ export function SexBadge({ sex }: { sex: Athlete["sex"] }) {
   );
 }
 
-/** Indicador de disciplina: praia ou quadra. */
+/** Indicador de disciplina: praia, quadra ou ambos. */
 export function ModalityBadge({ athlete }: { athlete: Athlete }) {
+  const both = !!athlete.beach_position && !!athlete.court_position;
   const beach = !!athlete.beach_position;
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-        beach ? "bg-amber-500/20 text-amber-400" : "bg-indigo-500/20 text-indigo-300",
+        both
+          ? "bg-emerald-500/20 text-emerald-300"
+          : beach
+            ? "bg-amber-500/20 text-amber-400"
+            : "bg-indigo-500/20 text-indigo-300",
       )}
-      title={beach ? "Vôlei de praia" : "Vôlei de quadra"}
+      title={both ? "Joga praia e quadra" : beach ? "Vôlei de praia" : "Vôlei de quadra"}
     >
-      {beach ? "🏖️ Praia" : "🏐 Quadra"}
+      {both ? "🏖️🏐 Ambos" : beach ? "🏖️ Praia" : "🏐 Quadra"}
     </span>
   );
 }

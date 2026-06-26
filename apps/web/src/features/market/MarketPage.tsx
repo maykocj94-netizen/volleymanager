@@ -84,22 +84,36 @@ function HireTab({ clubId }: { clubId: string | undefined }) {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {listings.map((li) => {
-            const canAfford = !!me && me.silver >= li.price;
+            const canSilver = !!me && me.silver >= li.price;
+            const canGold = li.price_gold > 0 && !!me && me.gold >= li.price_gold;
             return (
               <ListingCard
                 key={li.id}
                 listing={li}
                 footer={
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    onClick={() => hire.mutate(li.id)}
-                    disabled={hire.isPending || !canAfford}
-                    title={canAfford ? "" : "Prata insuficiente"}
-                  >
-                    <UserPlus className="h-4 w-4" /> Contratar por{" "}
-                    {li.price.toLocaleString("pt-BR")}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => hire.mutate({ listingId: li.id, currency: "silver" })}
+                      disabled={hire.isPending || !canSilver}
+                      title={canSilver ? "" : "Prata insuficiente"}
+                    >
+                      <UserPlus className="h-4 w-4" /> 🥈 {li.price.toLocaleString("pt-BR")} prata
+                    </Button>
+                    {li.price_gold > 0 && (
+                      <Button
+                        size="sm"
+                        variant="subtle"
+                        className="w-full"
+                        onClick={() => hire.mutate({ listingId: li.id, currency: "gold" })}
+                        disabled={hire.isPending || !canGold}
+                        title={canGold ? "" : "Ouro insuficiente"}
+                      >
+                        <UserPlus className="h-4 w-4" /> 🥇 {li.price_gold.toLocaleString("pt-BR")} ouro
+                      </Button>
+                    )}
+                  </div>
                 }
               />
             );
@@ -111,8 +125,15 @@ function HireTab({ clubId }: { clubId: string | undefined }) {
 }
 
 function ListingCard({ listing, footer }: { listing: HireListing; footer: React.ReactNode }) {
-  const pos = listing.beach_position ?? listing.court_position ?? "";
+  const both = !!listing.beach_position && !!listing.court_position;
   const beach = !!listing.beach_position;
+  const discipline = both ? "🏖️🏐 Ambos" : beach ? "🏖️ Praia" : "🏐 Quadra";
+  const positions = [
+    listing.beach_position && POSITION_LABEL[listing.beach_position],
+    listing.court_position && POSITION_LABEL[listing.court_position],
+  ]
+    .filter(Boolean)
+    .join(" / ");
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between">
@@ -123,13 +144,17 @@ function ListingCard({ listing, footer }: { listing: HireListing; footer: React.
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
             <span
               className={`rounded px-1.5 py-0.5 font-bold uppercase ${
-                beach ? "bg-amber-500/20 text-amber-400" : "bg-indigo-500/20 text-indigo-300"
+                both
+                  ? "bg-emerald-500/20 text-emerald-300"
+                  : beach
+                    ? "bg-amber-500/20 text-amber-400"
+                    : "bg-indigo-500/20 text-indigo-300"
               }`}
             >
-              {beach ? "🏖️ Praia" : "🏐 Quadra"}
+              {discipline}
             </span>
             <span className="text-ink-muted">
-              {POSITION_LABEL[pos] ?? pos} · {SEX_LABEL[listing.sex]}
+              {positions} · {SEX_LABEL[listing.sex]} · {listing.age} anos
             </span>
           </div>
         </div>
@@ -139,7 +164,7 @@ function ListingCard({ listing, footer }: { listing: HireListing; footer: React.
         </div>
       </div>
       <p className="mt-2 text-xs text-ink-faint">
-        ⏳ Validade após contratar: <b className="text-ink-muted">{listing.availability_days} dias</b>
+        📏 {listing.height_cm}cm · {listing.weight_kg}kg · ⏳ validade {listing.availability_days} dias
       </p>
       <div className="mt-3 border-t border-graphite-border pt-3">{footer}</div>
     </div>

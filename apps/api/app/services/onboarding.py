@@ -70,7 +70,8 @@ async def ensure_player_setup(
             country="BRA",
             city="Vitória",
             modality=Modality.BEACH_M.value,
-            reputation=55,
+            # Conta nova começa do zero: sem reputação (sobe jogando).
+            reputation=0,
             fanbase=1000,
             is_cpu=False,
         )
@@ -78,7 +79,8 @@ async def ensure_player_setup(
         await session.flush()
         created = True
 
-    await ensure_squads(session, club)
+    # Conta nova começa SEM elenco (do zero) — o jogador monta o time pelo
+    # Mercado (Contratações). NÃO geramos atletas iniciais aqui.
     # Remove atletas cuja validade (contratação por anúncio) expirou.
     from app.services.market_service import expire_due
     await expire_due(session, club_id=club.id)

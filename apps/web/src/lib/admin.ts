@@ -170,6 +170,15 @@ export function useAdminCreateListing() {
   });
 }
 
+export function useAdminUpdateListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; body: Record<string, unknown> }) =>
+      adminUpdateListing(v.id, v.body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
+  });
+}
+
 export function useAdminRepublishListing() {
   const qc = useQueryClient();
   return useMutation({

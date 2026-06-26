@@ -34,12 +34,14 @@ export interface HireListing {
   modality: Modality;
   court_position: CourtPosition | null;
   beach_position: BeachPosition | null;
+  age: number;
   height_cm: number;
   weight_kg: number;
   attributes: Record<string, number>;
   current_ability: number;
   potential_ability: number;
   price: number;
+  price_gold: number;
   availability_days: number;
   status: "published" | "hired" | "expired";
   hired_by: string | null;

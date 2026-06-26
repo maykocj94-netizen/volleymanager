@@ -127,12 +127,14 @@ class AdminService:
             modality=data["modality"],
             court_position=data.get("court_position"),
             beach_position=data.get("beach_position"),
+            age=int(data.get("age", 24)),
             height_cm=int(data.get("height_cm", 190)),
             weight_kg=int(data.get("weight_kg", 85)),
             attributes=attrs,
             current_ability=current,
             potential_ability=max(current, min(99, current + int(data.get("potential_bonus", 5)))),
             price=int(data.get("price", 1000)),
+            price_gold=int(data.get("price_gold", 0)),
             availability_days=int(data.get("availability_days", 30)),
             status="published",
         )
@@ -144,19 +146,29 @@ class AdminService:
         listing = await self.session.get(HireListing, listing_id)
         if listing is None:
             raise NotFound("Anúncio não encontrado.")
-        if "attributes" in data and data["attributes"] is not None:
-            base = listing.attributes or {}
-            attrs = {a: int(data["attributes"].get(a, base.get(a, 50))) for a in _ALL_ATTRS}
-            listing.attributes = attrs
-            listing.current_ability = _ability_from(
-                attrs, listing.court_position, listing.beach_position
-            )
+        # Posições (incl. limpar para deixar de ser "ambos").
+        if data.get("clear_court"):
+            listing.court_position = None
+        if data.get("clear_beach"):
+            listing.beach_position = None
+        for key in ("court_position", "beach_position"):
+            if data.get(key) is not None:
+                setattr(listing, key, data[key])
         for key in (
-            "first_name", "last_name", "country", "height_cm", "weight_kg",
-            "price", "availability_days",
+            "first_name", "last_name", "country", "sex", "modality",
+            "age", "height_cm", "weight_kg", "price", "price_gold", "availability_days",
         ):
             if data.get(key) is not None:
                 setattr(listing, key, data[key])
+        if data.get("attributes") is not None:
+            base = listing.attributes or {}
+            attrs = {a: int(data["attributes"].get(a, base.get(a, 50))) for a in _ALL_ATTRS}
+            listing.attributes = attrs
+        # Recalcula a habilidade pela posição + atributos atuais.
+        listing.current_ability = _ability_from(
+            listing.attributes or {}, listing.court_position, listing.beach_position
+        )
+        listing.potential_ability = max(listing.potential_ability, listing.current_ability)
         return listing
 
     async def republish_listing(self, listing_id: uuid.UUID) -> HireListing:

@@ -34,6 +34,7 @@ import {
   useAdminRepublishListing,
   useAdminResolveSale,
   useAdminSales,
+  useAdminUpdateListing,
   useAdminUsers,
 } from "@/lib/admin";
 
@@ -270,10 +271,11 @@ function ListingsPanel() {
   const { data: listings, isLoading } = useAdminListings();
   const republish = useAdminRepublishListing();
   const del = useAdminDeleteListing();
+  const [editing, setEditing] = useState<HireListing | null>(null);
 
   return (
     <div className="space-y-5">
-      <ListingForm />
+      <ListingForm key={editing?.id ?? "new"} editing={editing} onDone={() => setEditing(null)} />
       <div>
         <p className="mb-2 text-xs uppercase tracking-wide text-ink-faint">
           Anúncios ({listings?.length ?? 0})
@@ -284,30 +286,44 @@ function ListingsPanel() {
           <Card className="text-ink-muted">Nenhum anúncio criado ainda.</Card>
         ) : (
           <div className="space-y-2">
-            {listings.map((li) => (
-              <Card key={li.id} className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="flex items-center gap-2 font-semibold">
-                    {li.first_name} {li.last_name}
-                    <StatusBadge status={li.status} />
-                  </p>
-                  <p className="text-xs text-ink-muted">
-                    {li.beach_position ? "🏖️ Praia" : "🏐 Quadra"} · {SEX_LABEL[li.sex]} · CA {li.current_ability} ·
-                    🥈 {li.price.toLocaleString("pt-BR")} · validade {li.availability_days}d
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {li.status !== "published" && (
-                    <Button size="sm" onClick={() => republish.mutate(li.id)} disabled={republish.isPending}>
-                      <RotateCw className="h-4 w-4" /> Republicar
+            {listings.map((li) => {
+              const both = !!li.beach_position && !!li.court_position;
+              const disc = both ? "🏖️🏐 Ambos" : li.beach_position ? "🏖️ Praia" : "🏐 Quadra";
+              return (
+                <Card key={li.id} className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-2 font-semibold">
+                      {li.first_name} {li.last_name}
+                      <StatusBadge status={li.status} />
+                    </p>
+                    <p className="text-xs text-ink-muted">
+                      {disc} · {SEX_LABEL[li.sex]} · {li.age}a · CA {li.current_ability} · 🥈 {li.price.toLocaleString("pt-BR")}
+                      {li.price_gold > 0 && ` · 🥇 ${li.price_gold.toLocaleString("pt-BR")}`} · validade {li.availability_days}d
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="subtle"
+                      onClick={() => {
+                        setEditing(li);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" /> Editar
                     </Button>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={() => del.mutate(li.id)} disabled={del.isPending}>
-                    <Trash2 className="h-4 w-4 text-red-400" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                    {li.status !== "published" && (
+                      <Button size="sm" onClick={() => republish.mutate(li.id)} disabled={republish.isPending}>
+                        <RotateCw className="h-4 w-4" /> Republicar
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => del.mutate(li.id)} disabled={del.isPending}>
+                      <Trash2 className="h-4 w-4 text-red-400" />
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -332,51 +348,89 @@ function StatusBadge({ status }: { status: HireListing["status"] }) {
 
 const ATTR_KEYS = Object.keys(ATTRIBUTE_LABEL) as (keyof AthleteAttributes)[];
 
-function ListingForm() {
+type Discipline = "beach" | "indoor" | "both";
+
+function ListingForm({ editing, onDone }: { editing: HireListing | null; onDone: () => void }) {
   const create = useAdminCreateListing();
+  const update = useAdminUpdateListing();
   const [open, setOpen] = useState(true);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [sex, setSex] = useState<Sex>(Sex.MALE);
-  const [discipline, setDiscipline] = useState<"beach" | "indoor">("beach");
-  const [beachPos, setBeachPos] = useState<BeachPosition>(BeachPosition.UNIVERSAL);
-  const [courtPos, setCourtPos] = useState<CourtPosition>(CourtPosition.OUTSIDE);
-  const [price, setPrice] = useState(1000);
-  const [days, setDays] = useState(30);
-  const [attrs, setAttrs] = useState<Record<string, number>>(() =>
-    ATTR_KEYS.reduce((acc, k) => ({ ...acc, [k]: 65 }), {}),
+  const initDisc: Discipline = editing
+    ? editing.beach_position && editing.court_position
+      ? "both"
+      : editing.court_position
+        ? "indoor"
+        : "beach"
+    : "beach";
+  const [firstName, setFirstName] = useState(editing?.first_name ?? "");
+  const [lastName, setLastName] = useState(editing?.last_name ?? "");
+  const [sex, setSex] = useState<Sex>((editing?.sex as Sex) ?? Sex.MALE);
+  const [discipline, setDiscipline] = useState<Discipline>(initDisc);
+  const [beachPos, setBeachPos] = useState<BeachPosition>(
+    (editing?.beach_position as BeachPosition) ?? BeachPosition.UNIVERSAL,
   );
+  const [courtPos, setCourtPos] = useState<CourtPosition>(
+    (editing?.court_position as CourtPosition) ?? CourtPosition.OUTSIDE,
+  );
+  const [age, setAge] = useState(editing?.age ?? 24);
+  const [heightCm, setHeightCm] = useState(editing?.height_cm ?? 190);
+  const [weightKg, setWeightKg] = useState(editing?.weight_kg ?? 85);
+  const [price, setPrice] = useState(editing?.price ?? 1000);
+  const [priceGold, setPriceGold] = useState(editing?.price_gold ?? 0);
+  const [days, setDays] = useState(editing?.availability_days ?? 30);
+  const [attrs, setAttrs] = useState<Record<string, number>>(() => {
+    const base = ATTR_KEYS.reduce((acc, k) => ({ ...acc, [k]: 65 }), {} as Record<string, number>);
+    if (editing?.attributes) {
+      for (const k of ATTR_KEYS) if (editing.attributes[k] != null) base[k] = editing.attributes[k];
+    }
+    return base;
+  });
+
+  const busy = create.isPending || update.isPending;
+  const showBeach = discipline === "beach" || discipline === "both";
+  const showCourt = discipline === "indoor" || discipline === "both";
 
   function submit() {
     const modality =
-      discipline === "beach"
-        ? sex === Sex.MALE ? Modality.BEACH_M : Modality.BEACH_F
-        : sex === Sex.MALE ? Modality.INDOOR_M : Modality.INDOOR_F;
-    create.mutate(
-      {
-        first_name: firstName.trim() || "Atleta",
-        last_name: lastName.trim() || "Publicado",
-        country: "BRA",
-        sex,
-        modality,
-        beach_position: discipline === "beach" ? beachPos : null,
-        court_position: discipline === "indoor" ? courtPos : null,
-        height_cm: 190,
-        weight_kg: 85,
-        attributes: attrs,
-        price,
-        availability_days: days,
-      },
-      { onSuccess: () => { setFirstName(""); setLastName(""); } },
-    );
+      sex === Sex.MALE
+        ? discipline === "indoor" ? Modality.INDOOR_M : Modality.BEACH_M
+        : discipline === "indoor" ? Modality.INDOOR_F : Modality.BEACH_F;
+    const beach_position = showBeach ? beachPos : null;
+    const court_position = showCourt ? courtPos : null;
+    const body = {
+      first_name: firstName.trim() || "Atleta",
+      last_name: lastName.trim() || "Publicado",
+      country: "BRA",
+      sex,
+      modality,
+      beach_position,
+      court_position,
+      age,
+      height_cm: heightCm,
+      weight_kg: weightKg,
+      attributes: attrs,
+      price,
+      price_gold: priceGold,
+      availability_days: days,
+    };
+    if (editing) {
+      update.mutate(
+        { id: editing.id, body: { ...body, clear_beach: !beach_position, clear_court: !court_position } },
+        { onSuccess: onDone },
+      );
+    } else {
+      create.mutate(body, { onSuccess: () => { setFirstName(""); setLastName(""); } });
+    }
   }
 
   return (
     <Card>
       <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
         <div>
-          <p className="flex items-center gap-2 font-semibold"><Plus className="h-5 w-5 text-brand" /> Criar atleta para contratação</p>
-          <p className="text-sm text-ink-muted">Defina atributos, preço e validade. Ele entra em Contratações para todos.</p>
+          <p className="flex items-center gap-2 font-semibold">
+            {editing ? <Pencil className="h-5 w-5 text-brand" /> : <Plus className="h-5 w-5 text-brand" />}
+            {editing ? `Editar anúncio — ${editing.first_name} ${editing.last_name}` : "Criar atleta para contratação"}
+          </p>
+          <p className="text-sm text-ink-muted">Defina atributos, idade, físico, preço (prata/ouro) e validade.</p>
         </div>
         <span className="text-ink-muted">{open ? "▲" : "▼"}</span>
       </button>
@@ -393,31 +447,35 @@ function ListingForm() {
               </select>
             </Field>
             <Field label="Disciplina">
-              <select value={discipline} onChange={(e) => setDiscipline(e.target.value as "beach" | "indoor")} className="input">
+              <select value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)} className="input">
                 <option value="beach">Praia</option>
                 <option value="indoor">Quadra</option>
+                <option value="both">Ambos (praia e quadra)</option>
               </select>
             </Field>
-            <Field label="Posição">
-              {discipline === "beach" ? (
+            {showBeach && (
+              <Field label="Posição (praia)">
                 <select value={beachPos} onChange={(e) => setBeachPos(e.target.value as BeachPosition)} className="input">
                   {Object.values(BeachPosition).map((p) => <option key={p} value={p}>{POSITION_LABEL[p] ?? p}</option>)}
                 </select>
-              ) : (
+              </Field>
+            )}
+            {showCourt && (
+              <Field label="Posição (quadra)">
                 <select value={courtPos} onChange={(e) => setCourtPos(e.target.value as CourtPosition)} className="input">
                   {Object.values(CourtPosition).map((p) => <option key={p} value={p}>{POSITION_LABEL[p] ?? p}</option>)}
                 </select>
-              )}
-            </Field>
+              </Field>
+            )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Preço (prata)">
-              <input type="number" min={0} value={price} onChange={(e) => setPrice(Math.max(0, Number(e.target.value)))} className="input" />
-            </Field>
-            <Field label="Validade após contratar (dias reais)">
-              <input type="number" min={1} value={days} onChange={(e) => setDays(Math.max(1, Number(e.target.value)))} className="input" />
-            </Field>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Idade"><input type="number" min={15} max={50} value={age} onChange={(e) => setAge(Math.max(15, Math.min(50, Number(e.target.value) || 24)))} className="input" /></Field>
+            <Field label="Altura (cm)"><input type="number" min={140} max={230} value={heightCm} onChange={(e) => setHeightCm(Number(e.target.value) || 190)} className="input" /></Field>
+            <Field label="Peso (kg)"><input type="number" min={40} max={160} value={weightKg} onChange={(e) => setWeightKg(Number(e.target.value) || 85)} className="input" /></Field>
+            <Field label="Preço (prata)"><input type="number" min={0} value={price} onChange={(e) => setPrice(Math.max(0, Number(e.target.value)))} className="input" /></Field>
+            <Field label="Preço (ouro) — 0 = não vende por ouro"><input type="number" min={0} value={priceGold} onChange={(e) => setPriceGold(Math.max(0, Number(e.target.value)))} className="input" /></Field>
+            <Field label="Validade após contratar (dias reais)"><input type="number" min={1} value={days} onChange={(e) => setDays(Math.max(1, Number(e.target.value)))} className="input" /></Field>
           </div>
 
           <div>
@@ -436,12 +494,18 @@ function ListingForm() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button onClick={submit} disabled={create.isPending}>
-              {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Publicar anúncio
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={submit} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : editing ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {editing ? "Salvar alterações" : "Publicar anúncio"}
             </Button>
-            {create.isSuccess && <span className="text-sm text-emerald-400">Anúncio publicado!</span>}
+            {editing && (
+              <Button variant="ghost" onClick={onDone}>
+                <X className="h-4 w-4" /> Cancelar edição
+              </Button>
+            )}
+            {!editing && create.isSuccess && <span className="text-sm text-emerald-400">Anúncio publicado!</span>}
+            {editing && update.isSuccess && <span className="text-sm text-emerald-400">Salvo!</span>}
           </div>
         </div>
       )}

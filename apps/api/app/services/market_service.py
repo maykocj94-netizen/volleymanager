@@ -63,16 +63,29 @@ class MarketplaceService:
         )
         return list((await self.session.execute(stmt)).scalars().all())
 
-    async def hire(self, user_id: uuid.UUID, listing_id: uuid.UUID) -> tuple[Athlete, "object"]:
+    async def hire(
+        self, user_id: uuid.UUID, listing_id: uuid.UUID, currency: str = "silver"
+    ) -> tuple[Athlete, "object"]:
         repo = UserRepository(self.session)
         state = await repo.get_or_create_state(user_id)
         listing = await self.session.get(HireListing, listing_id)
         if listing is None or listing.status != "published":
             raise NotFound("Anúncio indisponível (já contratado ou removido).")
-        if state.silver < listing.price:
-            raise InsufficientFunds(
-                f"Precisa de {listing.price} de prata (tem {state.silver})."
-            )
+
+        # Pagamento em prata ou ouro (conforme o anúncio permitir).
+        if currency == "gold":
+            if listing.price_gold <= 0:
+                raise NotFound("Este anúncio não pode ser comprado com ouro.")
+            if state.gold < listing.price_gold:
+                raise InsufficientFunds(
+                    f"Precisa de {listing.price_gold} de ouro (tem {state.gold})."
+                )
+        else:
+            if state.silver < listing.price:
+                raise InsufficientFunds(
+                    f"Precisa de {listing.price} de prata (tem {state.silver})."
+                )
+
         club = await repo.get_main_club(user_id)
         now = datetime.now(timezone.utc)
         expires = now + timedelta(days=listing.availability_days)
@@ -83,12 +96,13 @@ class MarketplaceService:
             first_name=listing.first_name,
             last_name=listing.last_name,
             country=listing.country,
-            birth_date=date(datetime.now().year - 24, 1, 1),
+            birth_date=date(datetime.now().year - int(listing.age or 24), 1, 1),
             height_cm=listing.height_cm,
             weight_kg=listing.weight_kg,
             handedness="right",
             sex=listing.sex,
             modality=listing.modality,
+            # Copia as DUAS posições (anúncio "ambos" → joga praia e quadra).
             court_position=listing.court_position,
             beach_position=listing.beach_position,
             current_ability=listing.current_ability,
@@ -105,7 +119,10 @@ class MarketplaceService:
         self.session.add(athlete)
         self.session.add(attrs)
 
-        state.silver -= listing.price
+        if currency == "gold":
+            state.gold -= listing.price_gold
+        else:
+            state.silver -= listing.price
         listing.status = "hired"
         listing.hired_by = user_id
         listing.hired_at = now

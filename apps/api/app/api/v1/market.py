@@ -41,7 +41,9 @@ async def hire_listing(
     """Contrata um atleta anunciado. Único: some para os demais ao contratar."""
     uid = uuid.UUID(user.id)
     try:
-        athlete, state = await MarketplaceService(session).hire(uid, body.listing_id)
+        athlete, state = await MarketplaceService(session).hire(
+            uid, body.listing_id, body.currency
+        )
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except InsufficientFunds as exc:

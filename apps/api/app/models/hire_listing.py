@@ -25,15 +25,19 @@ class HireListing(Base):
     country: Mapped[str] = mapped_column(String, default="BRA", nullable=False)
     sex: Mapped[str] = mapped_column(String, nullable=False)
     modality: Mapped[str] = mapped_column(String, nullable=False)
+    # Disciplina: praia, quadra ou AMBOS (court_position e beach_position
+    # preenchidos = pode jogar nas duas modalidades).
     court_position: Mapped[str | None] = mapped_column(String, nullable=True)
     beach_position: Mapped[str | None] = mapped_column(String, nullable=True)
+    age: Mapped[int] = mapped_column(Integer, default=24, nullable=False)
     height_cm: Mapped[int] = mapped_column(Integer, default=190, nullable=False)
     weight_kg: Mapped[int] = mapped_column(Integer, default=85, nullable=False)
     attributes: Mapped[dict] = mapped_column(JSON, default=dict)
     current_ability: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
     potential_ability: Mapped[int] = mapped_column(Integer, default=65, nullable=False)
-    # Economia do anúncio.
+    # Economia do anúncio: pode ser comprado com prata e/ou ouro (0 = indisponível).
     price: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)  # prata
+    price_gold: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # ouro
     availability_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     # Ciclo de vida: published -> hired -> expired (-> published de novo ao republicar).
     status: Mapped[str] = mapped_column(String, default="published", nullable=False)

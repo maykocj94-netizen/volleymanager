@@ -50,7 +50,8 @@ _REP_LOSS = {"facil": -3, "medio": -2, "dificil": -1, "muito_dificil": 0, "bruta
 
 def _next_reputation(current: int, won: bool, tier: str) -> int:
     delta = _REP_WIN.get(tier, 2) if won else _REP_LOSS.get(tier, -1)
-    return max(1, min(100, (current or 50) + delta))
+    base = current if current is not None else 0
+    return max(1, min(100, base + delta))
 
 
 class NotEnoughAthletes(Exception):
