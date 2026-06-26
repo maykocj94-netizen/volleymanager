@@ -1,11 +1,23 @@
 """Engine e sessão SQLAlchemy assíncronos."""
 
+import ssl
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+
+
+def _supabase_ssl_context() -> ssl.SSLContext:
+    """SSL para o pooler do Supabase: conexão criptografada, mas sem verificar o
+    certificado — o cert do pooler não passa na verificação padrão no ambiente do
+    Render (CERTIFICATE_VERIFY_FAILED). A conexão continua via TLS."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
 
 # SQLite precisa de connect_args específico; Postgres usa pool_pre_ping.
 _engine_kwargs: dict = {"echo": False}
@@ -14,9 +26,12 @@ if settings.is_sqlite:
 else:
     _engine_kwargs["pool_pre_ping"] = True
     if "asyncpg" in settings.database_url:
-        # Supabase exige SSL; statement_cache_size=0 mantém compatibilidade com
-        # o pooler (pgBouncer/Supavisor em modo transação).
-        _engine_kwargs["connect_args"] = {"ssl": True, "statement_cache_size": 0}
+        # statement_cache_size=0 mantém compatibilidade com o pooler
+        # (pgBouncer/Supavisor); ssl = contexto TLS sem verificação de certificado.
+        _engine_kwargs["connect_args"] = {
+            "ssl": _supabase_ssl_context(),
+            "statement_cache_size": 0,
+        }
 
 engine = create_async_engine(settings.database_url, **_engine_kwargs)
 
