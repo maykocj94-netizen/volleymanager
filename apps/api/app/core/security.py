@@ -33,7 +33,10 @@ def decode_token(token: str) -> AuthUser:
             token,
             settings.supabase_jwt_secret,
             algorithms=["HS256"],
-            audience="authenticated",
+            # Não exigimos o audience: a segurança real é a assinatura (verificada
+            # com o JWT secret do projeto). O `aud` do Supabase varia entre versões
+            # e estava derrubando tokens válidos com 401.
+            options={"verify_aud": False},
         )
     except JWTError as exc:  # noqa: BLE001
         raise AuthError(f"Token inválido: {exc}") from exc
