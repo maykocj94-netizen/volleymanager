@@ -29,11 +29,11 @@ async def create_tables() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
-def _ensure_sqlite_columns(conn) -> None:  # noqa: ANN001
-    """Adiciona colunas novas dos models que faltem em tabelas existentes (SQLite).
+def _ensure_columns_sync(conn) -> None:  # noqa: ANN001
+    """Adiciona colunas novas dos models que faltem em tabelas já existentes.
 
-    create_all não altera tabelas já criadas; isto evita perder o progresso do
-    banco de desenvolvimento quando o schema evolui.
+    Funciona em SQLite (dev) e Postgres (prod): `create_all` não altera tabelas
+    que já existem, então isto cobre a evolução do schema sem perder dados.
     """
     from sqlalchemy import JSON, inspect
 
@@ -54,17 +54,21 @@ def _ensure_sqlite_columns(conn) -> None:  # noqa: ANN001
             elif default is not None and getattr(default, "arg", None) is not None \
                     and not callable(default.arg):
                 v = default.arg
-                ddl += f" DEFAULT {1 if v is True else 0 if v is False else v!r}" \
-                    if isinstance(v, (int, float, bool)) else f" DEFAULT '{v}'"
+                # bool antes de int (True é instância de int em Python). Postgres
+                # exige TRUE/FALSE; SQLite também aceita.
+                if isinstance(v, bool):
+                    ddl += f" DEFAULT {'TRUE' if v else 'FALSE'}"
+                elif isinstance(v, (int, float)):
+                    ddl += f" DEFAULT {v}"
+                else:
+                    ddl += f" DEFAULT '{v}'"
             conn.exec_driver_sql(ddl)
 
 
 async def ensure_columns() -> None:
-    """Migração leve de colunas faltantes (apenas SQLite/dev)."""
-    if not settings.is_sqlite:
-        return
+    """Migração leve de colunas faltantes (SQLite e Postgres)."""
     async with engine.begin() as conn:
-        await conn.run_sync(_ensure_sqlite_columns)
+        await conn.run_sync(_ensure_columns_sync)
 
 
 async def _ensure_clubs(session: AsyncSession, owner: uuid.UUID) -> Club:
