@@ -24,6 +24,7 @@ async def get_current_user(
         return AuthUser(id=settings.dev_user_id, email="dev@volley.local", role="dev")
 
     if not authorization or not authorization.lower().startswith("bearer "):
+        print("[auth] 401: header Authorization ausente ou sem 'Bearer'", flush=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais ausentes",
@@ -33,6 +34,7 @@ async def get_current_user(
     try:
         return decode_token(token)
     except AuthError as exc:
+        print(f"[auth] 401: {exc}", flush=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
