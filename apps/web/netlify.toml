@@ -1,0 +1,10 @@
+# Deploy do frontend no Netlify (base = apps/web)
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA fallback (React Router)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

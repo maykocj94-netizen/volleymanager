@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-ink antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Scrollbar discreta no tema escuro */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-graphite-border rounded-full;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-graphite-border bg-surface;
+  }
+
+  .input {
+    @apply h-10 w-full rounded-lg border border-graphite-border bg-graphite px-3 text-sm text-ink
+      focus:outline-none focus:ring-2 focus:ring-brand;
+  }
+}

@@ -1,0 +1,13 @@
+# Netlify — build do frontend (PWA React/Vite) a partir do monorepo.
+[build]
+  command = "npm run build:web"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Fallback de SPA (react-router) — também coberto por apps/web/public/_redirects.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

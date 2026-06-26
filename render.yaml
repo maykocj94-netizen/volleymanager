@@ -1,0 +1,31 @@
+# Render Blueprint — API do Volley Manager (FastAPI).
+# Uso: Render Dashboard → New → Blueprint → conecte este repositório.
+# Os valores marcados com sync:false são definidos por você no painel (segredos).
+services:
+  - type: web
+    name: volley-manager-api
+    runtime: docker
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: apps/api
+    plan: free
+    region: oregon
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: production
+      - key: DEV_NO_AUTH
+        value: "false"
+      - key: DEV_SEED
+        value: "false"
+      # Postgres do Supabase (use o driver asyncpg). Defina no painel:
+      #   postgresql+asyncpg://postgres.<ref>:<senha>@<host-do-pooler>:5432/postgres
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      # Domínio do front no Netlify (ex.: https://volley-manager.netlify.app)
+      - key: CORS_ORIGINS
+        sync: false
