@@ -11,6 +11,7 @@ from app.models.user_state import (
     HIRE_COST,
     LOGIN_STREAK_BONUS,
     LOGIN_STREAK_TARGET,
+    REVELATION_MAX_ABILITY,
     UserState,
 )
 from app.repositories.athlete_repo import AthleteRepository
@@ -89,6 +90,7 @@ class UserService:
             count=1,
             club_id=club.id if club else None,
             random_sex=True,
+            max_ability=REVELATION_MAX_ABILITY,
         )
         state.silver -= HIRE_COST
         return athletes[0], state

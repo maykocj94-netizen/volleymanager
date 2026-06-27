@@ -11,6 +11,8 @@ from app.core.database import Base
 STARTING_SILVER = 3000
 STARTING_GOLD = 0
 HIRE_COST = 1000
+# Revelação nasce fraca: pontuação final (e atributos) no máximo isto.
+REVELATION_MAX_ABILITY = 55
 LOGIN_STREAK_TARGET = 7
 LOGIN_STREAK_BONUS = 3000
 # Troca de cenário da partida (dificuldade/clima): 3 grátis por semana, depois custa.

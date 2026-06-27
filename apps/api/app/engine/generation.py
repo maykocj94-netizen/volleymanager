@@ -94,6 +94,7 @@ def _gen_one(
     pool: NamePool,
     today: date,
     random_sex: bool = False,
+    max_ability: int | None = None,
 ) -> GeneratedAthlete:
     # Sexo: segue a modalidade, salvo quando `random_sex` (revelação às cegas),
     # em que sorteamos e ajustamos a modalidade para o sexo escolhido.
@@ -133,10 +134,17 @@ def _gen_one(
         raw = base * (0.7 + 0.6 * w) + rng.gauss(0, 6)
         setattr(attrs, attr, _clamp(raw))
 
+    # Revelação (max_ability): nenhum atributo passa do teto, mantendo a forma
+    # relativa por posição — o atleta nasce fraco e evolui depois.
+    if max_ability is not None:
+        for attr in _ALL_ATTRS:
+            setattr(attrs, attr, _clamp(getattr(attrs, attr), 1, max_ability))
+
     # Habilidade atual = média ponderada pela posição, limitada ao potencial.
     weighted = sum(getattr(attrs, a) * weights.get(a, 0.5) for a in _ALL_ATTRS)
     total_w = sum(weights.get(a, 0.5) for a in _ALL_ATTRS)
-    current = _clamp(min(weighted / total_w, potential), 25, 99)
+    hi = max_ability if max_ability is not None else 99
+    current = _clamp(min(weighted / total_w, potential, hi), 20, hi)
 
     return GeneratedAthlete(
         first_name=first,
@@ -165,13 +173,18 @@ def generate_athletes(
     pool: NamePool | None = None,
     today: date | None = None,
     random_sex: bool = False,
+    max_ability: int | None = None,
 ) -> list[GeneratedAthlete]:
     """Gera `count` atletas de forma determinística a partir de `seed`.
 
     Se `random_sex` for True, o sexo de cada atleta é sorteado (e a modalidade
-    ajustada), usado na contratação de revelações às cegas.
+    ajustada), usado na contratação de revelações às cegas. `max_ability` limita
+    a pontuação final (revelação nasce fraca, teto 55).
     """
     rng = random.Random(seed)
     pool = pool or _default_pool()
     today = today or date.today()
-    return [_gen_one(rng, modality, country, pool, today, random_sex) for _ in range(count)]
+    return [
+        _gen_one(rng, modality, country, pool, today, random_sex, max_ability)
+        for _ in range(count)
+    ]

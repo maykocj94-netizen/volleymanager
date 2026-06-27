@@ -29,11 +29,14 @@ class AthleteService:
         seed: int | None = None,
         club_id: uuid.UUID | None = None,
         random_sex: bool = False,
+        max_ability: int | None = None,
     ) -> list[Athlete]:
-        """Gera atletas proceduralmente e persiste."""
+        """Gera atletas proceduralmente e persiste. `max_ability` limita a
+        pontuação final (revelação nasce fraca)."""
         seed = seed if seed is not None else secrets.randbits(48)
         generated = generate_athletes(
-            modality=modality, count=count, seed=seed, country=country, random_sex=random_sex
+            modality=modality, count=count, seed=seed, country=country,
+            random_sex=random_sex, max_ability=max_ability,
         )
         created: list[Athlete] = []
         for g in generated:
