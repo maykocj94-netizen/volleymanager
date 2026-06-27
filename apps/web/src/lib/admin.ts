@@ -98,7 +98,33 @@ export function useAdminCoins() {
   return useMutation({
     mutationFn: (v: { userId: string; silver_delta: number; gold_delta: number }) =>
       adminAdjustCoins(v.userId, { silver_delta: v.silver_delta, gold_delta: v.gold_delta }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+    // Update otimista: a carteira muda na tela na hora, sem esperar o servidor.
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: ["admin", "users"] });
+      const prev = qc.getQueryData<AdminUser[]>(["admin", "users"]);
+      qc.setQueryData<AdminUser[]>(["admin", "users"], (old) =>
+        old?.map((u) =>
+          u.user_id === v.userId
+            ? {
+                ...u,
+                silver: Math.max(0, u.silver + v.silver_delta),
+                gold: Math.max(0, u.gold + v.gold_delta),
+              }
+            : u,
+        ),
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["admin", "users"], ctx.prev);
+    },
+    onSuccess: (wallet) => {
+      qc.setQueryData<AdminUser[]>(["admin", "users"], (old) =>
+        old?.map((u) =>
+          u.user_id === wallet.user_id ? { ...u, silver: wallet.silver, gold: wallet.gold } : u,
+        ),
+      );
+    },
   });
 }
 
@@ -107,7 +133,11 @@ export function useAdminPatchAthlete(userId?: string) {
   return useMutation({
     mutationFn: (v: { athleteId: string; body: Record<string, unknown> }) =>
       adminPatchAthlete(v.athleteId, v.body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "athletes", userId] }),
+    onSuccess: (athlete) => {
+      qc.setQueryData<Athlete[]>(["admin", "athletes", userId], (old) =>
+        old?.map((a) => (a.id === athlete.id ? athlete : a)),
+      );
+    },
   });
 }
 
@@ -115,9 +145,11 @@ export function useAdminAddAthlete(userId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (modality: Modality) => adminAddAthlete(userId!, modality),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin", "athletes", userId] });
-      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    onSuccess: (athlete) => {
+      qc.setQueryData<Athlete[]>(["admin", "athletes", userId], (old) => [...(old ?? []), athlete]);
+      qc.setQueryData<AdminUser[]>(["admin", "users"], (old) =>
+        old?.map((u) => (u.user_id === userId ? { ...u, athlete_count: u.athlete_count + 1 } : u)),
+      );
     },
   });
 }
@@ -126,9 +158,15 @@ export function useAdminRemoveAthlete(userId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (athleteId: string) => adminRemoveAthlete(athleteId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin", "athletes", userId] });
-      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    onSuccess: (_res, athleteId) => {
+      qc.setQueryData<Athlete[]>(["admin", "athletes", userId], (old) =>
+        old?.filter((a) => a.id !== athleteId),
+      );
+      qc.setQueryData<AdminUser[]>(["admin", "users"], (old) =>
+        old?.map((u) =>
+          u.user_id === userId ? { ...u, athlete_count: Math.max(0, u.athlete_count - 1) } : u,
+        ),
+      );
     },
   });
 }
@@ -138,7 +176,11 @@ export function useAdminApproveUser() {
   return useMutation({
     mutationFn: (v: { userId: string; approved: boolean }) =>
       adminApproveUser(v.userId, v.approved),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+    onSuccess: (user) => {
+      qc.setQueryData<AdminUser[]>(["admin", "users"], (old) =>
+        old?.map((u) => (u.user_id === user.user_id ? user : u)),
+      );
+    },
   });
 }
 
@@ -151,9 +193,12 @@ export function useAdminResolveSale() {
   return useMutation({
     mutationFn: (v: { id: string; approve: boolean }) =>
       v.approve ? adminApproveSale(v.id) : adminRejectSale(v.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin", "sales"] });
-      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    onSuccess: (_res, v) => {
+      qc.setQueryData<SaleRequest[]>(["admin", "sales"], (old) =>
+        old?.filter((s) => s.id !== v.id),
+      );
+      // Aprovar credita prata ao vendedor — a carteira mudou no servidor.
+      if (v.approve) qc.invalidateQueries({ queryKey: ["admin", "users"] });
     },
   });
 }
@@ -166,7 +211,8 @@ export function useAdminCreateListing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: Record<string, unknown>) => adminCreateListing(body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
+    onSuccess: (li) =>
+      qc.setQueryData<HireListing[]>(["admin", "listings"], (old) => [li, ...(old ?? [])]),
   });
 }
 
@@ -175,7 +221,10 @@ export function useAdminUpdateListing() {
   return useMutation({
     mutationFn: (v: { id: string; body: Record<string, unknown> }) =>
       adminUpdateListing(v.id, v.body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
+    onSuccess: (li) =>
+      qc.setQueryData<HireListing[]>(["admin", "listings"], (old) =>
+        old?.map((x) => (x.id === li.id ? li : x)),
+      ),
   });
 }
 
@@ -183,7 +232,10 @@ export function useAdminRepublishListing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminRepublishListing(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
+    onSuccess: (li) =>
+      qc.setQueryData<HireListing[]>(["admin", "listings"], (old) =>
+        old?.map((x) => (x.id === li.id ? li : x)),
+      ),
   });
 }
 
@@ -191,6 +243,9 @@ export function useAdminDeleteListing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminDeleteListing(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "listings"] }),
+    onSuccess: (_res, id) =>
+      qc.setQueryData<HireListing[]>(["admin", "listings"], (old) =>
+        old?.filter((x) => x.id !== id),
+      ),
   });
 }
