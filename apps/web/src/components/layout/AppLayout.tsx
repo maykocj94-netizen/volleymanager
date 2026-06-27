@@ -14,6 +14,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Wallet } from "@/components/Wallet";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { ChallengeBanner } from "@/components/ChallengeBanner";
 import { AccountSettings } from "@/features/account/AccountSettings";
 import { useAuth } from "@/stores/auth";
 
@@ -31,8 +32,10 @@ export function AppLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const openSettings = () => setSettingsOpen(true);
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col">
       <AccountSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ChallengeBanner enabled />
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       {/* Sidebar (desktop) */}
       <aside className="hidden w-60 shrink-0 border-r border-graphite-border bg-surface p-4 md:flex md:flex-col">
         <Brand onClick={openSettings} />
@@ -79,6 +82,7 @@ export function AppLayout() {
         ))}
         <SignOutButton mobile />
       </nav>
+      </div>
     </div>
   );
 }

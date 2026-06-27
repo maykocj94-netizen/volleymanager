@@ -39,6 +39,8 @@ class UserState(Base):
     # Desafios X1 online.
     online_wins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     online_losses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Presença online (heartbeat): última vez visto no jogo.
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # { "beach": [athlete_id, ...], "indoor": [athlete_id, ...] }
     lineup: Mapped[dict] = mapped_column(JSON, default=dict)
     # Cenário atual da partida contra a CPU (estável até trocar):
