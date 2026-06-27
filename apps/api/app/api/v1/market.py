@@ -22,9 +22,9 @@ from app.services.user_service import InsufficientFunds, NotFound, UserService
 router = APIRouter(prefix="/market", tags=["market"])
 
 
-def _state_out(state, club_id) -> UserStateOut:  # noqa: ANN001
+def _state_out(state, club) -> UserStateOut:  # noqa: ANN001
     from app.api.v1.me import _to_out
-    return _to_out(state, club_id)
+    return _to_out(state, club)
 
 
 @router.get("/listings", response_model=list[HireListingOut])
@@ -51,7 +51,7 @@ async def hire_listing(
     club = await UserRepository(session).get_main_club(uid)
     return HireListingResult(
         athlete=AthleteOut.model_validate(athlete),
-        state=_state_out(state, club.id if club else None),
+        state=_state_out(state, club),
     )
 
 
@@ -82,7 +82,7 @@ async def cancel_sale(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     state = await UserService(session).get_state(uid)
     club = await UserRepository(session).get_main_club(uid)
-    return _state_out(state, club.id if club else None)
+    return _state_out(state, club)
 
 
 @router.get("/my-sales", response_model=list[SaleRequestOut])

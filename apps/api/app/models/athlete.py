@@ -38,8 +38,11 @@ class Athlete(Base):
     contract_until: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_injured: Mapped[bool] = mapped_column(Boolean, default=False)
     # Desempenho acumulado (alimenta a valorização de venda no mercado).
+    # wins/losses = partidas Single (offline). online_* = desafios X1 (online).
     wins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     losses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    online_wins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    online_losses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Atleta personalizado criado pelo jogador (aparece em Mercado → Contratações).
     is_custom: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Nível do atleta (LVL 1..999). Sobe ganhando/perdendo partidas (ganhar conta mais).

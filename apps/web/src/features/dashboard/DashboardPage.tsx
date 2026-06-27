@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Users, Star, Trophy, Swords, Gamepad2, Frown, Target } from "lucide-react";
+import { Users, Star, Trophy, Swords, Gamepad2, Frown, Target, Globe } from "lucide-react";
 import { MODALITY_LABEL } from "@volley/shared";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,11 @@ export function DashboardPage() {
     { label: "Vitórias", value: won, icon: Trophy, tone: "text-emerald-400" },
     { label: "Derrotas", value: lost, icon: Frown, tone: "text-red-400" },
     { label: "K/D (vit./der.)", value: computeKD(won, lost), icon: Target, tone: "text-brand" },
+  ];
+
+  const onlineStats = [
+    { label: "Vitórias Online", value: me?.online_wins ?? 0, icon: Globe, tone: "text-emerald-400" },
+    { label: "Derrotas Online", value: me?.online_losses ?? 0, icon: Globe, tone: "text-red-400" },
   ];
 
   return (
@@ -75,6 +80,21 @@ export function DashboardPage() {
       {/* Desempenho em partidas */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {matchStats.map((s) => (
+          <Card key={s.label} className="flex items-center gap-3">
+            <div className="rounded-lg bg-graphite p-2.5">
+              <s.icon className={`h-5 w-5 ${s.tone}`} />
+            </div>
+            <div>
+              <p className={`text-2xl font-bold tabular-nums ${s.tone}`}>{s.value}</p>
+              <p className="text-xs text-ink-muted">{s.label}</p>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Desafios online (X1) */}
+      <div className="grid grid-cols-2 gap-4">
+        {onlineStats.map((s) => (
           <Card key={s.label} className="flex items-center gap-3">
             <div className="rounded-lg bg-graphite p-2.5">
               <s.icon className={`h-5 w-5 ${s.tone}`} />

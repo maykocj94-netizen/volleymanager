@@ -30,15 +30,26 @@ class UserStateOut(BaseModel):
     matches_played: int = 0
     matches_won: int = 0
     matches_lost: int = 0
+    online_wins: int = 0
+    online_losses: int = 0
     approved: bool = True
     lineup: Lineup
     club_id: uuid.UUID | None = None
+    club_name: str | None = None
+    club_city: str | None = None
 
 
 class LoginResult(BaseModel):
     state: UserStateOut
     bonus_awarded: bool
     bonus_amount: int = 0
+
+
+class ClubUpdate(BaseModel):
+    """Personalização da conta: nome do clube e cidade."""
+
+    name: str | None = Field(default=None, max_length=40)
+    city: str | None = Field(default=None, max_length=60)
 
 
 class HireRequest(BaseModel):

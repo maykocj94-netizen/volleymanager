@@ -44,6 +44,8 @@ export const postNextDay = () =>
   api<LoginResult>("/api/v1/me/dev/next-day", { method: "POST" });
 export const putLineup = (lineup: Lineup) =>
   api<UserState>("/api/v1/me/lineup", { method: "PUT", body: JSON.stringify(lineup) });
+export const patchClub = (body: { name?: string; city?: string }) =>
+  api<UserState>("/api/v1/me/club", { method: "PATCH", body: JSON.stringify(body) });
 export const postHire = (modality: Modality) =>
   api<HireResult>("/api/v1/me/hire", {
     method: "POST",
@@ -149,6 +151,17 @@ export function useSaveLineup() {
   return useMutation({
     mutationFn: putLineup,
     onSuccess: (state) => qc.setQueryData(["me"], state),
+  });
+}
+
+export function useUpdateClub() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: patchClub,
+    onSuccess: (state) => {
+      qc.setQueryData(["me"], state);
+      qc.invalidateQueries({ queryKey: ["clubs", "mine"] });
+    },
   });
 }
 

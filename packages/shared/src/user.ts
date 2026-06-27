@@ -19,9 +19,13 @@ export interface UserState {
   matches_played: number;
   matches_won: number;
   matches_lost: number;
+  online_wins: number;
+  online_losses: number;
   approved: boolean;
   lineup: Lineup;
   club_id: string | null;
+  club_name: string | null;
+  club_city: string | null;
 }
 
 // --- Marketplace de contratações (anúncios do dono) ---

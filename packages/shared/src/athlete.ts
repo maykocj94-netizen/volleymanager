@@ -40,6 +40,8 @@ export interface Athlete {
   sale_value: number;
   wins: number;
   losses: number;
+  online_wins: number;
+  online_losses: number;
   is_custom: boolean;
   is_injured: boolean;
   level: number;

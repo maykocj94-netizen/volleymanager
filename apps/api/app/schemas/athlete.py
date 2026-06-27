@@ -52,6 +52,8 @@ class AthleteOut(BaseModel):
     sale_value: int
     wins: int
     losses: int
+    online_wins: int = 0
+    online_losses: int = 0
     is_custom: bool
     is_injured: bool
     # Progressão e condição física.

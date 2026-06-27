@@ -16,6 +16,7 @@ from app.schemas.athlete import AthleteOut
 from app.schemas.match import MatchEventOut, MatchResultOut, SetScoreOut
 from app.schemas.user import (
     AthleteIdRequest,
+    ClubUpdate,
     CpuInfoOut,
     HireRequest,
     HireResult,
@@ -56,7 +57,7 @@ def _result_out(result: MatchResult) -> MatchResultOut:
     )
 
 
-def _to_out(state: UserState, club_id: uuid.UUID | None) -> UserStateOut:
+def _to_out(state: UserState, club) -> UserStateOut:  # noqa: ANN001  (club: Club | None)
     lineup = state.lineup or {}
     return UserStateOut(
         silver=state.silver,
@@ -66,6 +67,8 @@ def _to_out(state: UserState, club_id: uuid.UUID | None) -> UserStateOut:
         matches_played=state.matches_played,
         matches_won=state.matches_won,
         matches_lost=state.matches_lost,
+        online_wins=state.online_wins,
+        online_losses=state.online_losses,
         approved=bool(state.approved),
         lineup=Lineup(
             beach_m=lineup.get("beach_m", []),
@@ -73,13 +76,14 @@ def _to_out(state: UserState, club_id: uuid.UUID | None) -> UserStateOut:
             indoor_m=lineup.get("indoor_m", []),
             indoor_f=lineup.get("indoor_f", []),
         ),
-        club_id=club_id,
+        club_id=club.id if club else None,
+        club_name=club.name if club else None,
+        club_city=club.city if club else None,
     )
 
 
-async def _club_id(session, user_id: uuid.UUID) -> uuid.UUID | None:  # noqa: ANN001
-    club = await UserRepository(session).get_main_club(user_id)
-    return club.id if club else None
+async def _club(session, user_id: uuid.UUID):  # noqa: ANN001, ANN201
+    return await UserRepository(session).get_main_club(user_id)
 
 
 @router.get("", response_model=UserStateOut)
@@ -88,7 +92,7 @@ async def get_me(session: DbSession, user: CurrentUser) -> UserStateOut:
     await ensure_player_setup(session, uid)
     service = UserService(session)
     state = await service.get_state(uid)
-    return _to_out(state, await _club_id(session, uid))
+    return _to_out(state, await _club(session, uid))
 
 
 @router.post("/login", response_model=LoginResult)
@@ -97,7 +101,7 @@ async def daily_login(session: DbSession, user: CurrentUser) -> LoginResult:
     await ensure_player_setup(session, uid)
     state, bonus = await UserService(session).daily_login(uid)
     return LoginResult(
-        state=_to_out(state, await _club_id(session, uid)),
+        state=_to_out(state, await _club(session, uid)),
         bonus_awarded=bonus,
         bonus_amount=LOGIN_STREAK_BONUS if bonus else 0,
     )
@@ -111,17 +115,33 @@ async def dev_next_day(session: DbSession, user: CurrentUser) -> LoginResult:
     uid = uuid.UUID(user.id)
     state, bonus = await UserService(session).simulate_next_day(uid)
     return LoginResult(
-        state=_to_out(state, await _club_id(session, uid)),
+        state=_to_out(state, await _club(session, uid)),
         bonus_awarded=bonus,
         bonus_amount=LOGIN_STREAK_BONUS if bonus else 0,
     )
+
+
+@router.patch("/club", response_model=UserStateOut)
+async def update_club(body: ClubUpdate, session: DbSession, user: CurrentUser) -> UserStateOut:
+    """Personaliza a conta: nome do clube e cidade."""
+    uid = uuid.UUID(user.id)
+    await ensure_player_setup(session, uid)
+    club = await _club(session, uid)
+    if club is None:
+        raise HTTPException(status_code=404, detail="Clube não encontrado.")
+    if body.name is not None and body.name.strip():
+        club.name = body.name.strip()
+    if body.city is not None:
+        club.city = body.city.strip() or None
+    state = await UserService(session).get_state(uid)
+    return _to_out(state, club)
 
 
 @router.put("/lineup", response_model=UserStateOut)
 async def save_lineup(body: Lineup, session: DbSession, user: CurrentUser) -> UserStateOut:
     uid = uuid.UUID(user.id)
     state = await UserService(session).set_lineup(uid, body.model_dump(mode="json"))
-    return _to_out(state, await _club_id(session, uid))
+    return _to_out(state, await _club(session, uid))
 
 
 @router.post("/hire", response_model=HireResult)
@@ -133,7 +153,7 @@ async def hire(body: HireRequest, session: DbSession, user: CurrentUser) -> Hire
         raise HTTPException(status_code=402, detail=str(exc)) from exc
     return HireResult(
         athlete=AthleteOut.model_validate(athlete),
-        state=_to_out(state, await _club_id(session, uid)),
+        state=_to_out(state, await _club(session, uid)),
     )
 
 
@@ -144,7 +164,7 @@ async def report_match_result(
     """Registra o resultado de uma partida (atualiza stats e desempenho dos atletas)."""
     uid = uuid.UUID(user.id)
     state = await UserService(session).record_match_result(uid, body.won, body.athlete_ids)
-    return _to_out(state, await _club_id(session, uid))
+    return _to_out(state, await _club(session, uid))
 
 
 @router.post("/sell", response_model=SellResult)
@@ -157,7 +177,7 @@ async def sell_athlete(
         value, state = await UserService(session).sell_athlete(uid, body.athlete_id)
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return SellResult(value=value, state=_to_out(state, await _club_id(session, uid)))
+    return SellResult(value=value, state=_to_out(state, await _club(session, uid)))
 
 
 @router.get("/scenario", response_model=ScenarioOut)
@@ -250,7 +270,7 @@ async def finish_match_ep(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return MatchFinishResult(
         cpu=CpuInfoOut(**cpu),
-        state=_to_out(state, await _club_id(session, uid)),
+        state=_to_out(state, await _club(session, uid)),
     )
 
 
@@ -283,5 +303,5 @@ async def sign_custom(
         raise HTTPException(status_code=402, detail=str(exc)) from exc
     return SignResult(
         athlete=AthleteOut.model_validate(athlete),
-        state=_to_out(state, await _club_id(session, uid)),
+        state=_to_out(state, await _club(session, uid)),
     )

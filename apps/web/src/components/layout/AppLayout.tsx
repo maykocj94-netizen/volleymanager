@@ -10,9 +10,11 @@ import {
   CircleDot,
   LogOut,
 } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Wallet } from "@/components/Wallet";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { AccountSettings } from "@/features/account/AccountSettings";
 import { useAuth } from "@/stores/auth";
 
 const nav = [
@@ -26,11 +28,14 @@ const nav = [
 ];
 
 export function AppLayout() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const openSettings = () => setSettingsOpen(true);
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
+      <AccountSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {/* Sidebar (desktop) */}
       <aside className="hidden w-60 shrink-0 border-r border-graphite-border bg-surface p-4 md:flex md:flex-col">
-        <Brand />
+        <Brand onClick={openSettings} />
         <Wallet className="mt-5 rounded-lg bg-graphite px-3 py-2" />
         <nav className="mt-6 flex flex-col gap-1">
           {nav.map((item) => (
@@ -44,7 +49,7 @@ export function AppLayout() {
 
       {/* Top bar (mobile): marca + carteira */}
       <header className="flex items-center justify-between border-b border-graphite-border bg-surface px-4 py-3 md:hidden">
-        <Brand />
+        <Brand onClick={openSettings} />
         <Wallet />
       </header>
 
@@ -113,15 +118,19 @@ function SignOutButton({ mobile }: { mobile?: boolean }) {
   );
 }
 
-function Brand() {
+function Brand({ onClick }: { onClick?: () => void }) {
   return (
-    <div className="flex items-center gap-2 px-2">
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-graphite-light"
+      title="Configurar minha conta (nome e cidade)"
+    >
       <CircleDot className="h-7 w-7 text-brand" />
       <div className="leading-tight">
         <p className="font-bold tracking-tight">Volley</p>
         <p className="text-xs text-ink-faint">Manager</p>
       </div>
-    </div>
+    </button>
   );
 }
 
