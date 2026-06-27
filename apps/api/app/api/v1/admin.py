@@ -254,6 +254,20 @@ async def admin_set_match_result(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.post("/tournaments/{tid}/advance", response_model=TournamentDetailOut)
+async def admin_advance_phase(
+    tid: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> TournamentDetailOut:
+    svc = TournamentService(session)
+    try:
+        await svc.advance_phase(tid)
+        return await _tour_detail(svc, tid)
+    except TournamentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TournamentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/tournaments/{tid}/finish", response_model=TournamentDetailOut)
 async def admin_finish_tournament(
     tid: uuid.UUID, session: DbSession, _admin: AdminAuth

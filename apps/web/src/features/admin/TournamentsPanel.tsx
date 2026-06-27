@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
+  useAdminAdvancePhase,
   useAdminCreateTournament,
   useAdminDeleteTournament,
   useAdminFinishTournament,
@@ -154,9 +155,14 @@ function CreateForm() {
             </Button>
             {create.isSuccess && <span className="text-sm text-emerald-400">Torneio criado!</span>}
           </div>
-          {f.type !== "round_robin" && (
-            <p className="text-xs text-amber-400">
-              ⚠️ Por ora, só "Pontos Corridos" pode ser iniciado/gerido. {TOURNAMENT_TYPE_LABEL[f.type]} entra em breve (já pode criar).
+          {f.type === "groups" && (
+            <p className="text-xs text-ink-faint">
+              💡 Grupos: após concluir as partidas de todos os grupos, clique em <b>Gerar fase final</b> (mata-mata dos classificados).
+            </p>
+          )}
+          {f.type === "repechage" && (
+            <p className="text-xs text-ink-faint">
+              💡 Repescagem: jogue a chave principal até a final; depois <b>Gerar repescagem</b> (chave dos eliminados decide o 3º).
             </p>
           )}
         </div>
@@ -168,9 +174,11 @@ function CreateForm() {
 function Manage({ id, onBack }: { id: string; onBack: () => void }) {
   const { data, isLoading } = useAdminTournament(id);
   const start = useAdminStartTournament(id);
+  const advance = useAdminAdvancePhase(id);
   const finish = useAdminFinishTournament(id);
   if (isLoading || !data) return <Spinner />;
   const t = data.tournament;
+  const canAdvance = t.status === "running" && (t.type === "groups" || t.type === "repechage");
 
   return (
     <div className="space-y-5">
@@ -190,6 +198,12 @@ function Manage({ id, onBack }: { id: string; onBack: () => void }) {
               <Play className="h-4 w-4" /> Iniciar (gerar tabela)
             </Button>
           )}
+          {canAdvance && (
+            <Button variant="subtle" onClick={() => advance.mutate()} disabled={advance.isPending}>
+              <Play className="h-4 w-4" />{" "}
+              {t.type === "groups" ? "Gerar fase final" : "Gerar repescagem"}
+            </Button>
+          )}
           {t.status === "running" && (
             <Button variant="outline" onClick={() => finish.mutate()} disabled={finish.isPending}>
               <Flag className="h-4 w-4" /> Finalizar e premiar
@@ -197,8 +211,10 @@ function Manage({ id, onBack }: { id: string; onBack: () => void }) {
           )}
         </div>
       </Card>
-      {start.isError && (
-        <Card className="text-sm text-red-400">{errMsg(start.error)}</Card>
+      {(start.isError || advance.isError || finish.isError) && (
+        <Card className="text-sm text-red-400">
+          {errMsg(start.error || advance.error || finish.error)}
+        </Card>
       )}
       {finish.isSuccess && t.status === "finished" && (
         <Card className="text-sm text-emerald-400">🏆 Torneio finalizado e premiação creditada!</Card>

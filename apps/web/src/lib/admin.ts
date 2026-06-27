@@ -95,6 +95,8 @@ export const adminSetMatchResult = (id: string, mid: string, scoreA: number, sco
     method: "POST",
     body: JSON.stringify({ score_a: scoreA, score_b: scoreB }),
   });
+export const adminAdvancePhase = (id: string) =>
+  adminApi<TournamentDetail>(`/api/v1/admin/tournaments/${id}/advance`, { method: "POST" });
 export const adminFinishTournament = (id: string) =>
   adminApi<TournamentDetail>(`/api/v1/admin/tournaments/${id}/finish`, { method: "POST" });
 export const adminDeleteTournament = (id: string) =>
@@ -307,6 +309,14 @@ export function useAdminSetResult(id: string) {
   return useMutation({
     mutationFn: (v: { mid: string; scoreA: number; scoreB: number }) =>
       adminSetMatchResult(id, v.mid, v.scoreA, v.scoreB),
+    onSuccess: (detail) => qc.setQueryData(["admin", "tournament", id], detail),
+  });
+}
+
+export function useAdminAdvancePhase(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminAdvancePhase(id),
     onSuccess: (detail) => qc.setQueryData(["admin", "tournament", id], detail),
   });
 }

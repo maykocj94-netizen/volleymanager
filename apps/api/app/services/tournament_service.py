@@ -9,9 +9,8 @@ Grupos e Repescagem reutilizam esta base (em desenvolvimento).
 """
 
 import uuid
-from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.athlete import Athlete
@@ -21,6 +20,34 @@ from app.repositories.user_repo import UserRepository
 
 _TEAM_SIZE = {"beach": 2, "indoor": 6}
 WIN_POINTS = 3
+
+# Famílias de estágios de cada "chave" de mata-mata (para avanço e colocação).
+# round = rodadas intermediárias, final = decisão, bronze = disputa de 3º.
+_BRACKETS = {
+    "main": {"round": "ko", "final": "final", "bronze": "bronze"},
+    "rep": {"round": "rep", "final": "rep_final", "bronze": None},
+}
+
+
+def _seed_order(size: int) -> list[int]:
+    """Ordem de chaveamento padrão (1-based) para `size` (potência de 2):
+    distribui os byes de forma equilibrada (1 enfrenta o último, etc.)."""
+    seeds = [1]
+    while len(seeds) < size:
+        m = len(seeds) * 2 + 1
+        nxt: list[int] = []
+        for s in seeds:
+            nxt.append(s)
+            nxt.append(m - s)
+        seeds = nxt
+    return seeds
+
+
+def _next_pow2(n: int) -> int:
+    p = 1
+    while p < n:
+        p *= 2
+    return p
 
 
 class TournamentError(Exception):
@@ -139,11 +166,14 @@ class TournamentService:
             raise TournamentError("Precisa de pelo menos 2 inscritos para iniciar.")
         if t.type == "round_robin":
             self._gen_round_robin(t, entries)
+        elif t.type == "knockout":
+            await self._gen_knockout(t, entries, bracket="main", with_bronze=True)
+        elif t.type == "repechage":
+            await self._gen_knockout(t, entries, bracket="main", with_bronze=False)
+        elif t.type == "groups":
+            self._gen_groups(t, entries)
         else:
-            raise TournamentError(
-                "Por enquanto só o formato 'Pontos Corridos' pode ser iniciado. "
-                "Mata-mata, Grupos e Repescagem entram em breve."
-            )
+            raise TournamentError("Formato de torneio desconhecido.")
         t.status = "running"
         await self.session.flush()
         return t
@@ -160,6 +190,158 @@ class TournamentService:
                     entry_a_id=a.id, entry_b_id=b.id, a_name=a.team_name, b_name=b.team_name,
                     status="pending",
                 ))
+
+    def _gen_groups(self, t: Tournament, entries: list[TournamentEntry]) -> None:
+        """Distribui em grupos (serpentina) e gera todos-contra-todos por grupo."""
+        g = max(1, t.num_groups)
+        groups: list[list[TournamentEntry]] = [[] for _ in range(g)]
+        for idx, e in enumerate(entries):
+            e.group_no = (idx % g) + 1
+            groups[idx % g].append(e)
+        order = 0
+        for gi, grp in enumerate(groups):
+            for i in range(len(grp)):
+                for j in range(i + 1, len(grp)):
+                    a, b = grp[i], grp[j]
+                    order += 1
+                    self.session.add(TournamentMatch(
+                        id=uuid.uuid4(), tournament_id=t.id, stage="group", group_no=gi + 1,
+                        round_no=1, order=order, entry_a_id=a.id, entry_b_id=b.id,
+                        a_name=a.team_name, b_name=b.team_name, status="pending",
+                    ))
+
+    async def _gen_knockout(
+        self, t: Tournament, entries: list[TournamentEntry], *, bracket: str, with_bronze: bool
+    ) -> None:
+        """Gera um chaveamento mata-mata com byes equilibrados e (opcional) disputa de 3º."""
+        cfg = _BRACKETS[bracket]
+        n = len(entries)
+        if n < 2:
+            return
+        size = _next_pow2(n)
+        rounds = size.bit_length() - 1
+        seeds = _seed_order(size)
+        slots = [entries[s - 1] if s <= n else None for s in seeds]
+
+        r1: list[TournamentMatch] = []
+        for i in range(size // 2):
+            a, b = slots[2 * i], slots[2 * i + 1]
+            stage = cfg["final"] if rounds == 1 else cfg["round"]
+            m = TournamentMatch(
+                id=uuid.uuid4(), tournament_id=t.id, stage=stage, round_no=1, order=i,
+                entry_a_id=a.id if a else None, entry_b_id=b.id if b else None,
+                a_name=a.team_name if a else "(bye)", b_name=b.team_name if b else "(bye)",
+                status="pending",
+            )
+            self.session.add(m)
+            r1.append(m)
+        for r in range(2, rounds + 1):
+            for i in range(size // (2 ** r)):
+                stage = cfg["final"] if r == rounds else cfg["round"]
+                self.session.add(TournamentMatch(
+                    id=uuid.uuid4(), tournament_id=t.id, stage=stage, round_no=r, order=i,
+                    a_name="A definir", b_name="A definir", status="pending",
+                ))
+        if with_bronze and cfg["bronze"] and rounds >= 2:
+            self.session.add(TournamentMatch(
+                id=uuid.uuid4(), tournament_id=t.id, stage=cfg["bronze"], round_no=rounds, order=99,
+                a_name="Perdedor da semi", b_name="Perdedor da semi", status="pending",
+            ))
+        await self.session.flush()
+        # Resolve byes (lado vazio): o time presente avança automaticamente.
+        for m in r1:
+            if (m.entry_a_id is None) ^ (m.entry_b_id is None):
+                win = m.entry_a_id or m.entry_b_id
+                m.winner_entry_id = win
+                m.score_a, m.score_b = (1, 0) if m.entry_a_id else (0, 1)
+                m.status = "done"
+                await self._advance_knockout(m)
+        await self.session.flush()
+
+    async def _place(self, match: TournamentMatch, entry_id: uuid.UUID, *, side_a: bool) -> None:
+        e = await self.session.get(TournamentEntry, entry_id)
+        name = e.team_name if e else "—"
+        if side_a:
+            match.entry_a_id, match.a_name = entry_id, name
+        else:
+            match.entry_b_id, match.b_name = entry_id, name
+
+    async def _advance_knockout(self, m: TournamentMatch) -> None:
+        bracket = "rep" if m.stage in ("rep", "rep_final") else "main"
+        cfg = _BRACKETS[bracket]
+        round_stages = (cfg["round"], cfg["final"])
+        if m.stage not in round_stages or m.winner_entry_id is None:
+            return
+        final_round = await self.session.scalar(
+            select(func.max(TournamentMatch.round_no)).where(
+                TournamentMatch.tournament_id == m.tournament_id,
+                TournamentMatch.stage.in_(round_stages),
+            )
+        )
+        winner = m.winner_entry_id
+        loser = m.entry_a_id if winner == m.entry_b_id else m.entry_b_id
+        if final_round and m.round_no < final_round:
+            nxt = (
+                await self.session.execute(
+                    select(TournamentMatch).where(
+                        TournamentMatch.tournament_id == m.tournament_id,
+                        TournamentMatch.stage.in_(round_stages),
+                        TournamentMatch.round_no == m.round_no + 1,
+                        TournamentMatch.order == m.order // 2,
+                    )
+                )
+            ).scalars().first()
+            if nxt is not None:
+                await self._place(nxt, winner, side_a=(m.order % 2 == 0))
+        # Perdedor da semifinal vai para a disputa de 3º.
+        if cfg["bronze"] and final_round and m.round_no == final_round - 1 and loser:
+            bronze = (
+                await self.session.execute(
+                    select(TournamentMatch).where(
+                        TournamentMatch.tournament_id == m.tournament_id,
+                        TournamentMatch.stage == cfg["bronze"],
+                    )
+                )
+            ).scalars().first()
+            if bronze is not None:
+                await self._place(bronze, loser, side_a=(m.order == 0))
+
+    async def advance_phase(self, tid: uuid.UUID) -> Tournament:
+        """Gera a próxima fase: grupos -> mata-mata dos classificados; repescagem
+        -> chave dos eliminados (após a final da chave principal)."""
+        t = await self.get(tid)
+        if t.status != "running":
+            raise TournamentError("O torneio não está em andamento.")
+        matches = await self.get_matches(tid)
+        entries = await self.get_entries(tid)
+        if t.type == "groups":
+            if any(m.stage in ("ko", "final", "bronze") for m in matches):
+                raise TournamentError("A fase final já foi gerada.")
+            group_m = [m for m in matches if m.stage == "group"]
+            if not group_m or any(m.status != "done" for m in group_m):
+                raise TournamentError("Conclua todas as partidas dos grupos primeiro.")
+            qualifiers: list[TournamentEntry] = []
+            for gi in range(1, t.num_groups + 1):
+                grp = self._rank([e for e in entries if e.group_no == gi])
+                qualifiers.extend(grp[: t.advance_per_group])
+            if len(qualifiers) < 2:
+                raise TournamentError("Classificados insuficientes para a fase final.")
+            await self._gen_knockout(t, qualifiers, bracket="main", with_bronze=True)
+        elif t.type == "repechage":
+            if any(m.stage in ("rep", "rep_final") for m in matches):
+                raise TournamentError("A repescagem já foi gerada.")
+            final_m = next((m for m in matches if m.stage == "final"), None)
+            if final_m is None or final_m.status != "done":
+                raise TournamentError("Conclua a chave principal (até a final) primeiro.")
+            finalists = {final_m.entry_a_id, final_m.entry_b_id}
+            eliminated = [e for e in entries if e.id not in finalists]
+            if len(eliminated) < 2:
+                raise TournamentError("Não há eliminados suficientes para a repescagem.")
+            await self._gen_knockout(t, eliminated, bracket="rep", with_bronze=False)
+        else:
+            raise TournamentError("Este formato não tem fase adicional.")
+        await self.session.flush()
+        return t
 
     async def set_result(
         self, tid: uuid.UUID, match_id: uuid.UUID, score_a: int, score_b: int
@@ -183,6 +365,8 @@ class TournamentService:
         m.winner_entry_id = m.entry_a_id if score_a > score_b else m.entry_b_id
         m.status = "done"
         await self._apply_standings(m, revert=False)
+        if m.stage in ("ko", "final", "rep", "rep_final"):
+            await self._advance_knockout(m)
         await self.session.flush()
         return m
 
@@ -214,7 +398,14 @@ class TournamentService:
         if t.status != "running":
             raise TournamentError("Inicie o torneio antes de finalizar.")
         entries = await self.get_entries(tid)
-        ranked = self._rank(entries)
+
+        if t.type == "round_robin":
+            ranked = self._rank(entries)
+            for idx, e in enumerate(ranked):
+                e.placement = idx + 1
+            podium: list[TournamentEntry | None] = list(ranked[:3])
+        else:
+            podium = await self._bracket_podium(t, entries)
 
         prizes = [
             (t.prize_silver_1, t.prize_gold_1),
@@ -222,17 +413,35 @@ class TournamentService:
             (t.prize_silver_3, t.prize_gold_3),
         ]
         repo = UserRepository(self.session)
-        for idx, entry in enumerate(ranked):
-            entry.placement = idx + 1
-            if idx < 3:
-                silver, gold = prizes[idx]
-                if silver or gold:
-                    state = await repo.get_or_create_state(entry.user_id)
-                    state.silver += int(silver)
-                    state.gold += int(gold)
+        for idx in range(3):
+            w = podium[idx] if idx < len(podium) else None
+            if w is None:
+                continue
+            w.placement = idx + 1
+            silver, gold = prizes[idx]
+            if silver or gold:
+                state = await repo.get_or_create_state(w.user_id)
+                state.silver += int(silver)
+                state.gold += int(gold)
         t.status = "finished"
         await self.session.flush()
         return t
+
+    async def _bracket_podium(
+        self, t: Tournament, entries: list[TournamentEntry]
+    ) -> list[TournamentEntry | None]:
+        matches = await self.get_matches(t.id)
+        by_id = {e.id: e for e in entries}
+        final_m = next((m for m in matches if m.stage == "final"), None)
+        if final_m is None or final_m.status != "done":
+            raise TournamentError("Defina o resultado da FINAL antes de finalizar.")
+        first = by_id.get(final_m.winner_entry_id)
+        loser = final_m.entry_a_id if final_m.winner_entry_id == final_m.entry_b_id else final_m.entry_b_id
+        second = by_id.get(loser)
+        third_stage = "rep_final" if t.type == "repechage" else "bronze"
+        bm = next((m for m in matches if m.stage == third_stage), None)
+        third = by_id.get(bm.winner_entry_id) if bm and bm.status == "done" and bm.winner_entry_id else None
+        return [first, second, third]
 
     @staticmethod
     def _rank(entries: list[TournamentEntry]) -> list[TournamentEntry]:
