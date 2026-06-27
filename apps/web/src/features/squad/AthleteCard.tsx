@@ -76,6 +76,30 @@ function injuryDaysLeft(until: string | null): string {
   return `${days}d`;
 }
 
+function expiresLabel(at: string | null): string {
+  if (!at) return "";
+  const ms = new Date(at).getTime() - Date.now();
+  if (ms <= 0) return "expirando…";
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  if (d > 0) return `${d}d ${h}h`;
+  const m = Math.floor((ms % 3600000) / 60000);
+  return `${h}h ${m}m`;
+}
+
+/** Atleta de contratação (anúncio): tempo restante no elenco antes de expirar. */
+export function ExpiresBadge({ athlete }: { athlete: Athlete }) {
+  if (!athlete.expires_at) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-bold text-purple-300"
+      title="Contratação por anúncio: ao expirar, sai do seu elenco"
+    >
+      ⏳ {expiresLabel(athlete.expires_at)}
+    </span>
+  );
+}
+
 const ALL_ATTRS = Object.keys(ATTRIBUTE_LABEL) as (keyof AthleteAttributes)[];
 
 /** Modal com estatísticas detalhadas do atleta (incl. V/D offline e online). */
@@ -94,6 +118,7 @@ export function AthleteDetail({ athlete, onClose }: { athlete: Athlete; onClose:
               <ModalityBadge athlete={athlete} />
               <span className="rounded bg-graphite px-1.5 py-0.5 text-[9px] font-bold uppercase text-brand">LVL {athlete.level}</span>
               <ConditionBadge athlete={athlete} />
+              <ExpiresBadge athlete={athlete} />
             </div>
             <p className="mt-1 text-xs text-ink-muted">
               {POSITION_LABEL[pos] ?? pos} · {age(athlete.birth_date)} anos · {athlete.height_cm}cm · {athlete.weight_kg}kg
@@ -190,6 +215,7 @@ export function AthleteCard({
               LVL {athlete.level}
             </span>
             <ConditionBadge athlete={athlete} />
+            <ExpiresBadge athlete={athlete} />
           </div>
           <p className="mt-1 text-xs text-ink-muted">
             {POSITION_LABEL[pos] ?? pos} · {age(athlete.birth_date)} anos · {athlete.height_cm}cm

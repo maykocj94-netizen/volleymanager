@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Button } from "@/components/ui/button";
 import { useClubAthletes, useMe, useMyClub } from "@/lib/game";
 import { API_URL, IS_LOCAL_API } from "@/lib/api";
+import { LoginStreakCard } from "./LoginStreakCard";
 
 /** K/D = razão média entre vitórias e derrotas. */
 function computeKD(won: number, lost: number): string {
@@ -45,6 +46,8 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <LoginStreakCard />
+
       <header>
         <h1 className="text-2xl font-bold">{club ? club.name : "Painel"}</h1>
         <p className="text-sm text-ink-muted">

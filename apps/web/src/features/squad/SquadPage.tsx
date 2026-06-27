@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { UserPlus, Loader2, CalendarPlus, Flame } from "lucide-react";
+import { UserPlus, Loader2 } from "lucide-react";
 import {
   HIRE_COST,
-  LOGIN_STREAK_TARGET,
   Modality,
   SEX_LABEL,
 } from "@volley/shared";
@@ -13,7 +12,6 @@ import {
   useHire,
   useMe,
   useMyClub,
-  useNextDay,
 } from "@/lib/game";
 import { AthleteCard } from "./AthleteCard";
 import { LineupEditor } from "./LineupEditor";
@@ -24,7 +22,6 @@ export function SquadPage() {
   const { data: athletes, isLoading } = useClubAthletes(club?.id);
   const { data: me } = useMe();
   const hire = useHire(club?.id);
-  const nextDay = useNextDay();
   const [hireMod, setHireMod] = useState<Modality>(Modality.BEACH_M);
   const [tab, setTab] = useState<"all" | "beach" | "indoor">("all");
 
@@ -93,36 +90,6 @@ export function SquadPage() {
           Prata insuficiente para contratar. Faça login diário para ganhar bônus.
         </p>
       )}
-
-      {/* Streak de login */}
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Flame className="h-6 w-6 text-brand" />
-          <div>
-            <p className="font-semibold">
-              Sequência de login: {me?.streak ?? 0}/{LOGIN_STREAK_TARGET} dias
-            </p>
-            <p className="text-xs text-ink-muted">
-              Complete {LOGIN_STREAK_TARGET} dias seguidos e ganhe {3000} de prata (3 contratações).
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1">
-            {Array.from({ length: LOGIN_STREAK_TARGET }).map((_, i) => (
-              <span
-                key={i}
-                className={`h-2.5 w-2.5 rounded-full ${
-                  i < (me?.streak ?? 0) ? "bg-brand" : "bg-graphite-border"
-                }`}
-              />
-            ))}
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => nextDay.mutate()} disabled={nextDay.isPending}>
-            <CalendarPlus className="h-4 w-4" /> Avançar dia (teste)
-          </Button>
-        </div>
-      </Card>
 
       {/* Construtor de escalação (categorias Masc/Fem) */}
       <Card>

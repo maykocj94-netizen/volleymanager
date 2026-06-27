@@ -30,6 +30,9 @@ export function LineupEditor({
   const [sex, setSex] = useState<Sex>(lockSex ?? Sex.MALE);
   const [beachSel, setBeachSel] = useState<string[]>(["", ""]);
   const [indoorSel, setIndoorSel] = useState<string[]>(Array(INDOOR_SLOTS.length).fill(""));
+  // Compacto por padrão (abre ao clicar). Em telas de só-uma-disciplina, já abre.
+  const [openBeach, setOpenBeach] = useState(only === "beach");
+  const [openIndoor, setOpenIndoor] = useState(only === "indoor");
 
   useEffect(() => {
     if (lockSex) setSex(lockSex);
@@ -86,10 +89,14 @@ export function LineupEditor({
         </div>
       )}
 
-      <div className={`grid gap-4 ${showBeach && showIndoor ? "lg:grid-cols-2" : ""}`}>
+      <div className={`grid gap-3 ${showBeach && showIndoor ? "lg:grid-cols-2" : ""}`}>
         {showBeach && (
-          <div>
-            <p className="mb-2 font-semibold">🏖️ Dupla de Praia ({SEX_LABEL[sex]})</p>
+          <Section
+            title={`🏖️ Dupla de Praia (${SEX_LABEL[sex]})`}
+            count={`${beachSel.filter(Boolean).length}/2`}
+            open={openBeach}
+            onToggle={() => setOpenBeach((v) => !v)}
+          >
             <div className="space-y-2">
               {[0, 1].map((i) => (
                 <PlayerSelect
@@ -107,12 +114,16 @@ export function LineupEditor({
                 </p>
               )}
             </div>
-          </div>
+          </Section>
         )}
 
         {showIndoor && (
-          <div>
-            <p className="mb-2 font-semibold">🏐 Sexteto de Quadra ({SEX_LABEL[sex]})</p>
+          <Section
+            title={`🏐 Sexteto de Quadra (${SEX_LABEL[sex]})`}
+            count={`${indoorSel.filter(Boolean).length}/${INDOOR_SLOTS.length}`}
+            open={openIndoor}
+            onToggle={() => setOpenIndoor((v) => !v)}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
               {INDOOR_SLOTS.map((slot, i) => (
                 <PlayerSelect
@@ -125,7 +136,7 @@ export function LineupEditor({
                 />
               ))}
             </div>
-          </div>
+          </Section>
         )}
       </div>
 
@@ -136,6 +147,34 @@ export function LineupEditor({
         </Button>
         {save.isSuccess && <span className="ml-3 text-sm text-emerald-400">Escalação salva!</span>}
       </div>
+    </div>
+  );
+}
+
+/** Seção colapsável de escalação (compacta no celular; expande ao clicar). */
+function Section({
+  title,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-graphite-border bg-graphite/30">
+      <button onClick={onToggle} className="flex w-full items-center justify-between px-3 py-2.5 text-left">
+        <span className="font-semibold">{title}</span>
+        <span className="flex items-center gap-2 text-xs text-ink-muted">
+          <span className="rounded bg-graphite px-1.5 py-0.5 tabular-nums">{count}</span>
+          <span>{open ? "▲" : "▼"}</span>
+        </span>
+      </button>
+      {open && <div className="border-t border-graphite-border p-3">{children}</div>}
     </div>
   );
 }
