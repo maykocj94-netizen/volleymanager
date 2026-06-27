@@ -6,6 +6,8 @@ import type {
   HireListing,
   Modality,
   SaleRequest,
+  Tournament,
+  TournamentDetail,
 } from "@volley/shared";
 import { API_URL } from "./api";
 
@@ -79,6 +81,24 @@ export const adminRepublishListing = (id: string) =>
   adminApi<HireListing>(`/api/v1/admin/listings/${id}/republish`, { method: "POST" });
 export const adminDeleteListing = (id: string) =>
   adminApi<{ ok: boolean }>(`/api/v1/admin/listings/${id}`, { method: "DELETE" });
+
+// torneios
+export const adminListTournaments = () => adminApi<Tournament[]>("/api/v1/admin/tournaments");
+export const adminTournamentDetail = (id: string) =>
+  adminApi<TournamentDetail>(`/api/v1/admin/tournaments/${id}`);
+export const adminCreateTournament = (body: Record<string, unknown>) =>
+  adminApi<Tournament>("/api/v1/admin/tournaments", { method: "POST", body: JSON.stringify(body) });
+export const adminStartTournament = (id: string) =>
+  adminApi<TournamentDetail>(`/api/v1/admin/tournaments/${id}/start`, { method: "POST" });
+export const adminSetMatchResult = (id: string, mid: string, scoreA: number, scoreB: number) =>
+  adminApi<TournamentDetail>(`/api/v1/admin/tournaments/${id}/matches/${mid}/result`, {
+    method: "POST",
+    body: JSON.stringify({ score_a: scoreA, score_b: scoreB }),
+  });
+export const adminFinishTournament = (id: string) =>
+  adminApi<TournamentDetail>(`/api/v1/admin/tournaments/${id}/finish`, { method: "POST" });
+export const adminDeleteTournament = (id: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/tournaments/${id}`, { method: "DELETE" });
 
 // --- hooks ---
 export function useAdminUsers() {
@@ -247,5 +267,66 @@ export function useAdminDeleteListing() {
       qc.setQueryData<HireListing[]>(["admin", "listings"], (old) =>
         old?.filter((x) => x.id !== id),
       ),
+  });
+}
+
+// --- torneios (admin) ---
+export function useAdminTournaments() {
+  return useQuery({ queryKey: ["admin", "tournaments"], queryFn: adminListTournaments });
+}
+
+export function useAdminTournament(id: string | null) {
+  return useQuery({
+    queryKey: ["admin", "tournament", id],
+    queryFn: () => adminTournamentDetail(id!),
+    enabled: !!id,
+  });
+}
+
+export function useAdminCreateTournament() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => adminCreateTournament(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tournaments"] }),
+  });
+}
+
+export function useAdminStartTournament(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminStartTournament(id),
+    onSuccess: (detail) => {
+      qc.setQueryData(["admin", "tournament", id], detail);
+      qc.invalidateQueries({ queryKey: ["admin", "tournaments"] });
+    },
+  });
+}
+
+export function useAdminSetResult(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { mid: string; scoreA: number; scoreB: number }) =>
+      adminSetMatchResult(id, v.mid, v.scoreA, v.scoreB),
+    onSuccess: (detail) => qc.setQueryData(["admin", "tournament", id], detail),
+  });
+}
+
+export function useAdminFinishTournament(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminFinishTournament(id),
+    onSuccess: (detail) => {
+      qc.setQueryData(["admin", "tournament", id], detail);
+      qc.invalidateQueries({ queryKey: ["admin", "tournaments"] });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] }); // premiação creditada
+    },
+  });
+}
+
+export function useAdminDeleteTournament() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminDeleteTournament(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tournaments"] }),
   });
 }

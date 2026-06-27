@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield,
-  Check, X, Tag, UserPlus, RotateCw, Hourglass,
+  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy,
 } from "lucide-react";
 import {
   ATTRIBUTE_LABEL,
@@ -37,8 +37,9 @@ import {
   useAdminUpdateListing,
   useAdminUsers,
 } from "@/lib/admin";
+import { TournamentsPanel } from "./TournamentsPanel";
 
-type Tab = "contas" | "vendas" | "anuncios";
+type Tab = "contas" | "vendas" | "anuncios" | "torneios";
 
 export function AdminPanel() {
   const navigate = useNavigate();
@@ -77,11 +78,15 @@ export function AdminPanel() {
         <TabBtn active={tab === "anuncios"} onClick={() => setTab("anuncios")}>
           <UserPlus className="h-4 w-4" /> Anúncios
         </TabBtn>
+        <TabBtn active={tab === "torneios"} onClick={() => setTab("torneios")}>
+          <Trophy className="h-4 w-4" /> Torneios
+        </TabBtn>
       </div>
 
       {tab === "contas" && <AccountsPanel />}
       {tab === "vendas" && <SalesPanel />}
       {tab === "anuncios" && <ListingsPanel />}
+      {tab === "torneios" && <TournamentsPanel />}
     </div>
   );
 }

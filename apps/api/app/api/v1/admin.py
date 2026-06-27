@@ -20,8 +20,18 @@ from app.schemas.market import (
     HireListingUpdate,
     SaleRequestOut,
 )
+from app.schemas.tournament import (
+    MatchResultRequest,
+    TournamentCreate,
+    TournamentDetailOut,
+    TournamentEntryOut,
+    TournamentMatchOut,
+    TournamentOut,
+)
 from app.services.admin_service import AdminService
 from app.services.sales_service import SalesService
+from app.services.tournament_service import NotFound as TournamentNotFound
+from app.services.tournament_service import TournamentError, TournamentService
 from app.services.user_service import NotFound
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -174,5 +184,96 @@ async def delete_listing(
     try:
         await AdminService(session).delete_listing(listing_id)
     except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+# --- Competições (torneios) -----------------------------------------------
+async def _tour_detail(svc: TournamentService, tid: uuid.UUID) -> TournamentDetailOut:
+    t = await svc.get(tid)
+    entries = await svc.get_entries(tid)
+    matches = await svc.get_matches(tid)
+    return TournamentDetailOut(
+        tournament=TournamentOut(**svc._tour_dict(t, len(entries))),
+        entries=[TournamentEntryOut.model_validate(e) for e in entries],
+        matches=[TournamentMatchOut.model_validate(m) for m in matches],
+        my_entry_id=None,
+    )
+
+
+@router.get("/tournaments", response_model=list[TournamentOut])
+async def admin_list_tournaments(session: DbSession, _admin: AdminAuth) -> list[TournamentOut]:
+    rows = await TournamentService(session).list_for_users()
+    return [TournamentOut(**r) for r in rows]
+
+
+@router.post("/tournaments", response_model=TournamentOut, status_code=201)
+async def admin_create_tournament(
+    body: TournamentCreate, session: DbSession, _admin: AdminAuth
+) -> TournamentOut:
+    svc = TournamentService(session)
+    t = await svc.create(body.model_dump())
+    return TournamentOut(**svc._tour_dict(t, 0))
+
+
+@router.get("/tournaments/{tid}", response_model=TournamentDetailOut)
+async def admin_tournament_detail(
+    tid: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> TournamentDetailOut:
+    try:
+        return await _tour_detail(TournamentService(session), tid)
+    except TournamentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/tournaments/{tid}/start", response_model=TournamentDetailOut)
+async def admin_start_tournament(
+    tid: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> TournamentDetailOut:
+    svc = TournamentService(session)
+    try:
+        await svc.start(tid)
+        return await _tour_detail(svc, tid)
+    except TournamentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TournamentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/tournaments/{tid}/matches/{mid}/result", response_model=TournamentDetailOut)
+async def admin_set_match_result(
+    tid: uuid.UUID, mid: uuid.UUID, body: MatchResultRequest, session: DbSession, _admin: AdminAuth
+) -> TournamentDetailOut:
+    svc = TournamentService(session)
+    try:
+        await svc.set_result(tid, mid, body.score_a, body.score_b)
+        return await _tour_detail(svc, tid)
+    except TournamentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TournamentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/tournaments/{tid}/finish", response_model=TournamentDetailOut)
+async def admin_finish_tournament(
+    tid: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> TournamentDetailOut:
+    svc = TournamentService(session)
+    try:
+        await svc.finish(tid)
+        return await _tour_detail(svc, tid)
+    except TournamentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TournamentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.delete("/tournaments/{tid}")
+async def admin_delete_tournament(
+    tid: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> dict[str, bool]:
+    try:
+        await TournamentService(session).delete(tid)
+    except TournamentNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"ok": True}
