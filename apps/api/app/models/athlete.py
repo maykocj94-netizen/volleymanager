@@ -80,12 +80,16 @@ class Athlete(Base):
 
     @property
     def sale_value(self) -> int:
-        """Preço de venda: base pela habilidade, valorizado por vitórias e
-        desvalorizado por derrotas (cada vitória +4%, cada derrota −3%)."""
-        base = round((self.current_ability or 50) ** 2 * 0.5)
-        mult = 1.0 + 0.04 * (self.wins or 0) - 0.03 * (self.losses or 0)
-        mult = max(0.4, min(2.5, mult))
-        return max(100, round(base * mult))
+        """Preço de venda. Atleta NASCE bem desvalorizado (bem abaixo do custo de
+        1000 de uma revelação, evitando o farm de comprar-e-vender) e se VALORIZA
+        com o tempo: pelo nível (LVL) e pelas vitórias acumuladas; derrotas reduzem
+        um pouco. A habilidade pesa pouco — o valor vem do desenvolvimento."""
+        lvl = max(1, self.level or 1)
+        wins = self.wins or 0
+        losses = self.losses or 0
+        value = 100 + lvl * 35 + wins * 28 + (self.current_ability or 50) * 2
+        value -= losses * 12
+        return max(50, round(value))
 
 
 class AthleteAttributes(Base):
