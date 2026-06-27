@@ -16,6 +16,7 @@ export function TrainingButton({
   const train = useTrain(clubId);
   const today = new Date().toISOString().slice(0, 10);
   const trainedToday = athlete.last_trained_on === today;
+  const isListing = !!athlete.listing_id; // atleta de anúncio: não treina
 
   function pick(training: string) {
     train.mutate(
@@ -31,11 +32,17 @@ export function TrainingButton({
         size="sm"
         className="w-full"
         onClick={() => setOpen(true)}
-        disabled={trainedToday}
-        title={trainedToday ? "Este atleta já treinou hoje" : "Escolher um treino"}
+        disabled={trainedToday || isListing}
+        title={
+          isListing
+            ? "Atleta de contratação (anúncio) não pode treinar"
+            : trainedToday
+              ? "Este atleta já treinou hoje"
+              : "Escolher um treino"
+        }
       >
         <Dumbbell className="h-4 w-4" />
-        {trainedToday ? "Treinou hoje" : "Treinar"}
+        {isListing ? "Contratação" : trainedToday ? "Treinou hoje" : "Treinar"}
       </Button>
 
       {open && (

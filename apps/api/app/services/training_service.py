@@ -54,6 +54,8 @@ class TrainingService:
         athlete = await AthleteRepository(self.session).get(athlete_id)
         if athlete is None or athlete.club_id != club.id:
             raise NotFound("Atleta não encontrado no seu elenco.")
+        if athlete.listing_id is not None:
+            raise TrainingError("Atletas de contratação (anúncio) não podem treinar.")
         today = date.today()
         if athlete.last_trained_on == today:
             raise TrainingError("Este atleta já treinou hoje. Volte amanhã.")

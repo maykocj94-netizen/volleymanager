@@ -50,6 +50,7 @@ export interface Athlete {
   last_trained_on: string | null;
   for_sale: boolean;
   expires_at: string | null;
+  listing_id: string | null;
   attributes: AthleteAttributes | null;
 }
 

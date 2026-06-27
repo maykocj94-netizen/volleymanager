@@ -30,6 +30,8 @@ class SalesService:
         athlete = await AthleteRepository(self.session).get(athlete_id)
         if athlete is None or club is None or athlete.club_id != club.id:
             raise NotFound("Atleta não encontrado no seu elenco.")
+        if athlete.listing_id is not None:
+            raise NotFound("Atletas de contratação (anúncio) não podem ser vendidos.")
         # Reaproveita pedido pendente, se já houver.
         existing = (
             await self.session.execute(

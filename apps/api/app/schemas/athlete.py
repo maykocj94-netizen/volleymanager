@@ -63,6 +63,7 @@ class AthleteOut(BaseModel):
     last_trained_on: date | None = None
     for_sale: bool = False
     expires_at: datetime | None = None
+    listing_id: uuid.UUID | None = None  # veio de um anúncio (não vende, não treina)
     attributes: AttributesOut | None = None
 
 

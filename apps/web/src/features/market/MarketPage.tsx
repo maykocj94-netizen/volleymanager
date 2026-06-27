@@ -202,7 +202,11 @@ function SellTab({ clubId }: { clubId: string | undefined }) {
               key={a.id}
               athlete={a}
               footer={
-                pending ? (
+                a.listing_id ? (
+                  <span className="flex items-center gap-1 text-xs text-ink-faint">
+                    🔒 Contratação — não pode ser vendida
+                  </span>
+                ) : pending ? (
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1 text-xs text-amber-400">
                       <Hourglass className="h-3.5 w-3.5" /> Aguardando aprovação
