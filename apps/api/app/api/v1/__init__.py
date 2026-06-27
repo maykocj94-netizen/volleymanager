@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
-    admin, athletes, clubs, health, market, matches, me, online, tournaments,
+    admin, athletes, clubs, health, market, matches, me, online, store, tournaments,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -15,4 +15,5 @@ api_router.include_router(me.router)
 api_router.include_router(market.router)
 api_router.include_router(tournaments.router)
 api_router.include_router(online.router)
+api_router.include_router(store.router)
 api_router.include_router(admin.router)

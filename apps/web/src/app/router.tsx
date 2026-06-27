@@ -4,7 +4,8 @@ import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ExhibitionPage } from "@/features/match/ExhibitionPage";
 import { SquadPage } from "@/features/squad/SquadPage";
 import { MarketPage } from "@/features/market/MarketPage";
-import { StorePage } from "@/features/placeholders";
+import { StorePage } from "@/features/store/StorePage";
+import { CtPage } from "@/features/ct/CtPage";
 import { CompetitionsPage } from "@/features/competitions/CompetitionsPage";
 import { OnlineMatchPage } from "@/features/online/OnlineMatchPage";
 import { LoginPage } from "@/features/auth/LoginPage";
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { path: "partida-online", element: <OnlineMatchPage /> },
       { path: "competicoes", element: <CompetitionsPage /> },
       { path: "loja", element: <StorePage /> },
+      { path: "ct", element: <CtPage /> },
     ],
   },
 ]);

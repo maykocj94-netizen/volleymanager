@@ -20,6 +20,7 @@ from app.schemas.market import (
     HireListingUpdate,
     SaleRequestOut,
 )
+from app.schemas.store import ProductCreate, ProductOut, ProductUpdate
 from app.schemas.tournament import (
     MatchResultRequest,
     TournamentCreate,
@@ -30,6 +31,7 @@ from app.schemas.tournament import (
 )
 from app.services.admin_service import AdminService
 from app.services.sales_service import SalesService
+from app.services.store_service import StoreAdminService, StoreError
 from app.services.tournament_service import NotFound as TournamentNotFound
 from app.services.tournament_service import TournamentError, TournamentService
 from app.services.user_service import NotFound
@@ -289,5 +291,49 @@ async def admin_delete_tournament(
     try:
         await TournamentService(session).delete(tid)
     except TournamentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+# --- Loja (produtos do CT — só admin) -------------------------------------
+@router.get("/products", response_model=list[ProductOut])
+async def admin_list_products(session: DbSession, _admin: AdminAuth) -> list[ProductOut]:
+    rows = await StoreAdminService(session).list_products()
+    return [ProductOut(**r) for r in rows]
+
+
+@router.post("/products", response_model=ProductOut, status_code=201)
+async def admin_create_product(
+    body: ProductCreate, session: DbSession, _admin: AdminAuth
+) -> ProductOut:
+    try:
+        row = await StoreAdminService(session).create_product(body.model_dump())
+    except StoreError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ProductOut(**row)
+
+
+@router.patch("/products/{product_id}", response_model=ProductOut)
+async def admin_update_product(
+    product_id: uuid.UUID, body: ProductUpdate, session: DbSession, _admin: AdminAuth
+) -> ProductOut:
+    try:
+        row = await StoreAdminService(session).update_product(
+            product_id, body.model_dump(exclude_unset=True)
+        )
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except StoreError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ProductOut(**row)
+
+
+@router.delete("/products/{product_id}")
+async def admin_delete_product(
+    product_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> dict[str, bool]:
+    try:
+        await StoreAdminService(session).delete_product(product_id)
+    except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"ok": True}

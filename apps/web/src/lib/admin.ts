@@ -6,6 +6,7 @@ import type {
   HireListing,
   Modality,
   SaleRequest,
+  StoreProduct,
   Tournament,
   TournamentDetail,
 } from "@volley/shared";
@@ -81,6 +82,15 @@ export const adminRepublishListing = (id: string) =>
   adminApi<HireListing>(`/api/v1/admin/listings/${id}/republish`, { method: "POST" });
 export const adminDeleteListing = (id: string) =>
   adminApi<{ ok: boolean }>(`/api/v1/admin/listings/${id}`, { method: "DELETE" });
+
+// loja (produtos do CT — só admin)
+export const adminListProducts = () => adminApi<StoreProduct[]>("/api/v1/admin/products");
+export const adminCreateProduct = (body: Record<string, unknown>) =>
+  adminApi<StoreProduct>("/api/v1/admin/products", { method: "POST", body: JSON.stringify(body) });
+export const adminUpdateProduct = (id: string, body: Record<string, unknown>) =>
+  adminApi<StoreProduct>(`/api/v1/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const adminDeleteProduct = (id: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/products/${id}`, { method: "DELETE" });
 
 // torneios
 export const adminListTournaments = () => adminApi<Tournament[]>("/api/v1/admin/tournaments");
@@ -338,5 +348,42 @@ export function useAdminDeleteTournament() {
   return useMutation({
     mutationFn: (id: string) => adminDeleteTournament(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "tournaments"] }),
+  });
+}
+
+// --- loja (produtos do CT) ---
+export function useAdminProducts() {
+  return useQuery({ queryKey: ["admin", "products"], queryFn: adminListProducts });
+}
+
+export function useAdminCreateProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => adminCreateProduct(body),
+    onSuccess: (p) =>
+      qc.setQueryData<StoreProduct[]>(["admin", "products"], (old) => [p, ...(old ?? [])]),
+  });
+}
+
+export function useAdminUpdateProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; body: Record<string, unknown> }) =>
+      adminUpdateProduct(v.id, v.body),
+    onSuccess: (p) =>
+      qc.setQueryData<StoreProduct[]>(["admin", "products"], (old) =>
+        old?.map((x) => (x.id === p.id ? p : x)),
+      ),
+  });
+}
+
+export function useAdminDeleteProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminDeleteProduct(id),
+    onSuccess: (_res, id) =>
+      qc.setQueryData<StoreProduct[]>(["admin", "products"], (old) =>
+        old?.filter((x) => x.id !== id),
+      ),
   });
 }

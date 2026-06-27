@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield,
-  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy,
+  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag,
 } from "lucide-react";
 import {
   ATTRIBUTE_LABEL,
   BeachPosition,
   CourtPosition,
+  CT_ITEMS,
   Modality,
   POSITION_LABEL,
   Sex,
@@ -15,7 +16,9 @@ import {
   type AdminUser,
   type Athlete,
   type AthleteAttributes,
+  type CtItemType,
   type HireListing,
+  type StoreProduct,
 } from "@volley/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,19 +30,23 @@ import {
   useAdminAthletes,
   useAdminCoins,
   useAdminCreateListing,
+  useAdminCreateProduct,
   useAdminDeleteListing,
+  useAdminDeleteProduct,
   useAdminListings,
   useAdminPatchAthlete,
+  useAdminProducts,
   useAdminRemoveAthlete,
   useAdminRepublishListing,
   useAdminResolveSale,
   useAdminSales,
   useAdminUpdateListing,
+  useAdminUpdateProduct,
   useAdminUsers,
 } from "@/lib/admin";
 import { TournamentsPanel } from "./TournamentsPanel";
 
-type Tab = "contas" | "vendas" | "anuncios" | "torneios";
+type Tab = "contas" | "vendas" | "anuncios" | "torneios" | "loja";
 
 export function AdminPanel() {
   const navigate = useNavigate();
@@ -81,12 +88,16 @@ export function AdminPanel() {
         <TabBtn active={tab === "torneios"} onClick={() => setTab("torneios")}>
           <Trophy className="h-4 w-4" /> Torneios
         </TabBtn>
+        <TabBtn active={tab === "loja"} onClick={() => setTab("loja")}>
+          <ShoppingBag className="h-4 w-4" /> Loja
+        </TabBtn>
       </div>
 
       {tab === "contas" && <AccountsPanel />}
       {tab === "vendas" && <SalesPanel />}
       {tab === "anuncios" && <ListingsPanel />}
       {tab === "torneios" && <TournamentsPanel />}
+      {tab === "loja" && <ProductsPanel />}
     </div>
   );
 }
@@ -510,6 +521,173 @@ function ListingForm({ editing, onDone }: { editing: HireListing | null; onDone:
               </Button>
             )}
             {!editing && create.isSuccess && <span className="text-sm text-emerald-400">Anúncio publicado!</span>}
+            {editing && update.isSuccess && <span className="text-sm text-emerald-400">Salvo!</span>}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ====================== LOJA (produtos do CT) ======================
+function ProductsPanel() {
+  const { data: products, isLoading } = useAdminProducts();
+  const del = useAdminDeleteProduct();
+  const update = useAdminUpdateProduct();
+  const [editing, setEditing] = useState<StoreProduct | null>(null);
+
+  return (
+    <div className="space-y-5">
+      <ProductForm key={editing?.id ?? "new"} editing={editing} onDone={() => setEditing(null)} />
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-wide text-ink-faint">
+          Produtos ({products?.length ?? 0})
+        </p>
+        {isLoading ? (
+          <Spinner />
+        ) : !products?.length ? (
+          <Card className="text-ink-muted">Nenhum produto criado ainda.</Card>
+        ) : (
+          <div className="space-y-2">
+            {products.map((p) => (
+              <Card key={p.id} className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 font-semibold">
+                    <span className="text-lg">{p.item_emoji}</span> {p.name}
+                    {!p.active && (
+                      <span className="rounded bg-graphite px-1.5 py-0.5 text-[9px] font-bold uppercase text-ink-faint">
+                        oculto
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-ink-muted">
+                    Entrega {p.quantity}× {p.item_label} ·{" "}
+                    {p.price_silver > 0 ? `🥈 ${p.price_silver.toLocaleString("pt-BR")}` : "—"}
+                    {p.price_gold > 0 && ` · 🥇 ${p.price_gold.toLocaleString("pt-BR")}`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => update.mutate({ id: p.id, body: { active: !p.active } })}
+                    disabled={update.isPending}
+                  >
+                    {p.active ? "Ocultar" : "Publicar"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => {
+                      setEditing(p);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" /> Editar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => del.mutate(p.id)} disabled={del.isPending}>
+                    <Trash2 className="h-4 w-4 text-red-400" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProductForm({ editing, onDone }: { editing: StoreProduct | null; onDone: () => void }) {
+  const create = useAdminCreateProduct();
+  const update = useAdminUpdateProduct();
+  const [open, setOpen] = useState(true);
+  const [name, setName] = useState(editing?.name ?? "");
+  const [description, setDescription] = useState(editing?.description ?? "");
+  const [itemType, setItemType] = useState<CtItemType>(editing?.item_type ?? "bola");
+  const [quantity, setQuantity] = useState(editing?.quantity ?? 1);
+  const [priceSilver, setPriceSilver] = useState(editing?.price_silver ?? 100);
+  const [priceGold, setPriceGold] = useState(editing?.price_gold ?? 0);
+  const [imageUrl, setImageUrl] = useState(editing?.image_url ?? "");
+  const busy = create.isPending || update.isPending;
+
+  function submit() {
+    const body = {
+      name: name.trim() || "Produto",
+      description: description.trim() || null,
+      item_type: itemType,
+      quantity,
+      price_silver: priceSilver,
+      price_gold: priceGold,
+      image_url: imageUrl.trim() || null,
+      active: editing?.active ?? true,
+    };
+    if (editing) {
+      update.mutate({ id: editing.id, body }, { onSuccess: onDone });
+    } else {
+      create.mutate(body, { onSuccess: () => { setName(""); setDescription(""); } });
+    }
+  }
+
+  return (
+    <Card>
+      <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
+        <div>
+          <p className="flex items-center gap-2 font-semibold">
+            {editing ? <Pencil className="h-5 w-5 text-brand" /> : <Plus className="h-5 w-5 text-brand" />}
+            {editing ? `Editar produto — ${editing.name}` : "Criar produto da Loja"}
+          </p>
+          <p className="text-sm text-ink-muted">
+            Escolha o item do CT que o produto entrega e os preços (prata/ouro).
+          </p>
+        </div>
+        <span className="text-ink-muted">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Nome do produto">
+              <input value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="Ex.: Refletor 400w" />
+            </Field>
+            <Field label="Item do CT que entrega">
+              <select value={itemType} onChange={(e) => setItemType(e.target.value as CtItemType)} className="input">
+                {CT_ITEMS.map((i) => (
+                  <option key={i.type} value={i.type}>{i.emoji} {i.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Quantidade entregue por compra">
+              <input type="number" min={1} max={999} value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, Math.min(999, Number(e.target.value) || 1)))} className="input" />
+            </Field>
+            <Field label="Preço (prata) — 0 = não vende por prata">
+              <input type="number" min={0} value={priceSilver}
+                onChange={(e) => setPriceSilver(Math.max(0, Number(e.target.value)))} className="input" />
+            </Field>
+            <Field label="Preço (ouro) — 0 = não vende por ouro">
+              <input type="number" min={0} value={priceGold}
+                onChange={(e) => setPriceGold(Math.max(0, Number(e.target.value)))} className="input" />
+            </Field>
+            <Field label="Imagem (URL opcional)">
+              <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="input" placeholder="https://… (opcional)" />
+            </Field>
+          </div>
+          <Field label="Descrição (opcional)">
+            <input value={description} onChange={(e) => setDescription(e.target.value)} className="input" placeholder="Detalhes do produto" />
+          </Field>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={submit} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : editing ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {editing ? "Salvar alterações" : "Publicar produto"}
+            </Button>
+            {editing && (
+              <Button variant="ghost" onClick={onDone}>
+                <X className="h-4 w-4" /> Cancelar edição
+              </Button>
+            )}
+            {!editing && create.isSuccess && <span className="text-sm text-emerald-400">Produto publicado!</span>}
             {editing && update.isSuccess && <span className="text-sm text-emerald-400">Salvo!</span>}
           </div>
         </div>

@@ -4,3 +4,4 @@ export * from "./athlete";
 export * from "./user";
 export * from "./tournament";
 export * from "./online";
+export * from "./store";
