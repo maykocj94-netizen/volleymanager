@@ -250,9 +250,12 @@ class PlayService:
             else:
                 a.losses += 1
             apply_level(a, won, rng)
-            changed = register_play(a, hard=hard, rng=rng, now=now)
-            if changed:
-                statuses[str(a.id)] = changed
+            # Atletas de contratação (anúncio criado pelo dono) não fadigam nem
+            # lesionam. Revelação e demais seguem o ecossistema normal.
+            if a.listing_id is None:
+                changed = register_play(a, hard=hard, rng=rng, now=now)
+                if changed:
+                    statuses[str(a.id)] = changed
             a.market_value = a.sale_value
         for a in bench:
             refresh_condition(a, now)
@@ -262,4 +265,8 @@ class PlayService:
             scenario, names, team_name, kind,
             gold=GOLD_PER_WIN if won else 0, statuses=statuses,
         )
+        # Próxima partida = novo adversário (dificuldade, tática, clima e nomes
+        # diferentes), sorteado automaticamente ao concluir a atual. Não consome
+        # trocas grátis nem cobra prata — só vale para o sorteio manual (reroll).
+        state.scenario = roll_scenario()
         return state, result, cpu_info

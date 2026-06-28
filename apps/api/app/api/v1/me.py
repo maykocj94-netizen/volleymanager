@@ -92,6 +92,9 @@ async def get_me(session: DbSession, user: CurrentUser) -> UserStateOut:
     await ensure_player_setup(session, uid)
     service = UserService(session)
     state = await service.get_state(uid)
+    # Captura o e-mail de login (do JWT) para exibir na central de contas.
+    if user.email and state.email != user.email:
+        state.email = user.email
     return _to_out(state, await _club(session, uid))
 
 

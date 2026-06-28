@@ -1,8 +1,12 @@
-import { useMemo, useState } from "react";
-import { Loader2, Swords, Trophy, Users2, X, Check, Coins, Flag } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Loader2, Swords, Trophy, Users2, X, Check, Coins, Flag, FastForward,
+} from "lucide-react";
 import {
   type Athlete,
+  type Challenge,
   type ChallengeBrief,
+  type MatchEvent,
   type OnlineUser,
 } from "@volley/shared";
 import { Button } from "@/components/ui/button";
@@ -23,13 +27,20 @@ import { AthleteDetail } from "@/features/squad/AthleteCard";
 export function OnlineMatchPage() {
   const hb = useHeartbeat();
   const activeId = hb.data?.active_id ?? null;
+  // Permite sair da sala/resultado sem esperar o servidor expirar o desafio.
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const showLobby = activeId && activeId !== dismissed;
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold">Partida Online (X1)</h1>
         <p className="text-sm text-ink-muted">Desafie outros treinadores e aposte moedas. O vencedor leva tudo.</p>
       </header>
-      {activeId ? <LobbyView id={activeId} /> : <OnlineList hb={hb.data} />}
+      {showLobby ? (
+        <LobbyView key={activeId} id={activeId} onLeave={() => setDismissed(activeId)} />
+      ) : (
+        <OnlineList hb={hb.data} />
+      )}
     </div>
   );
 }
@@ -162,7 +173,7 @@ function ChallengeDialog({ user, onClose }: { user: OnlineUser; onClose: () => v
   );
 }
 
-function LobbyView({ id }: { id: string }) {
+function LobbyView({ id, onLeave }: { id: string; onLeave: () => void }) {
   const { data: lobby, isLoading } = useLobby(id);
   const cancel = useCancelChallenge();
   const [detail, setDetail] = useState<Athlete | null>(null);
@@ -199,14 +210,13 @@ function LobbyView({ id }: { id: string }) {
       </Card>
 
       {finished ? (
-        <Card className="text-center">
-          <Trophy className={cn("mx-auto h-10 w-10", iWon ? "text-amber-400" : "text-ink-faint")} />
-          <p className="mt-2 text-lg font-bold">{c.result_text}</p>
-          <p className={cn("mt-1 font-semibold", iWon ? "text-emerald-400" : "text-red-400")}>
-            {iWon ? `🎉 Você venceu! ${c.bet_amount > 0 ? `+${c.bet_amount} ${c.bet_currency === "gold" ? "ouro" : "prata"}` : ""}` : "Você perdeu este desafio."}
-          </p>
-          <p className="mt-1 text-sm text-ink-muted">Placar {c.score_home} x {c.score_away}</p>
-        </Card>
+        <OnlineReplay
+          challenge={c}
+          iWon={iWon}
+          myName={myName}
+          theirName={theirName}
+          onLeave={onLeave}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Meu time */}
@@ -242,6 +252,130 @@ function LobbyView({ id }: { id: string }) {
           <Loader2 className="mx-auto h-5 w-5 animate-spin" /> Aguardando o adversário ficar pronto…
         </Card>
       )}
+    </div>
+  );
+}
+
+const REPLAY_SPEEDS = [2, 4, 6, 8, 12] as const;
+const REPLAY_BASE_MS = 700;
+
+function deriveScore(events: MatchEvent[]) {
+  let home = 0, away = 0, setHome = 0, setAway = 0;
+  for (const e of events) {
+    if (e.event_type === "set_start") { home = 0; away = 0; }
+    else if (e.event_type === "point") { if (e.side === "home") home++; else away++; }
+    else if (e.event_type === "set_end") { if (home > away) setHome++; else setAway++; }
+  }
+  return { home, away, setHome, setAway };
+}
+
+/** Reprodução narrada do X1 (challenger = "home"). Esconde o resultado até o fim. */
+function OnlineReplay({
+  challenge: c, iWon, myName, theirName, onLeave,
+}: {
+  challenge: Challenge; iWon: boolean; myName: string; theirName: string; onLeave: () => void;
+}) {
+  const events = useMemo(() => (Array.isArray(c.events) ? c.events : []), [c.events]);
+  const [revealed, setRevealed] = useState(0);
+  const [speed, setSpeed] = useState<number>(2);
+  const logRef = useRef<HTMLDivElement>(null);
+  const hasEvents = events.length > 0;
+  const done = !hasEvents || revealed >= events.length;
+
+  useEffect(() => {
+    if (done) return;
+    const t = setTimeout(() => setRevealed((r) => r + 1), REPLAY_BASE_MS / speed);
+    return () => clearTimeout(t);
+  }, [revealed, speed, done, events.length]);
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [revealed]);
+
+  const shown = useMemo(() => events.slice(0, revealed), [events, revealed]);
+  const score = useMemo(() => deriveScore(shown), [shown]);
+
+  return (
+    <div className="space-y-4">
+      {/* Placar */}
+      <Card>
+        <div className="flex items-center justify-around text-center">
+          <div className="w-28">
+            <p className="truncate font-semibold">{c.challenger_name}</p>
+            <p className="text-3xl font-black tabular-nums text-brand">{score.setHome}</p>
+            <p className="text-[10px] uppercase text-ink-faint">sets</p>
+          </div>
+          <div>
+            <div className="text-4xl font-black tabular-nums">
+              {score.home} <span className="text-ink-faint">x</span> {score.away}
+            </div>
+            <div className="text-xs uppercase tracking-widest text-ink-faint">ponto do set</div>
+          </div>
+          <div className="w-28">
+            <p className="truncate font-semibold">{c.opponent_name}</p>
+            <p className="text-3xl font-black tabular-nums text-brand">{score.setAway}</p>
+            <p className="text-[10px] uppercase text-ink-faint">sets</p>
+          </div>
+        </div>
+
+        {done ? (
+          <div className="mt-4 space-y-1 text-center">
+            <Trophy className={cn("mx-auto h-9 w-9", iWon ? "text-amber-400" : "text-ink-faint")} />
+            <p className="text-lg font-bold">{c.result_text}</p>
+            <p className={cn("font-semibold", iWon ? "text-emerald-400" : "text-red-400")}>
+              {iWon
+                ? `🎉 Você venceu! ${c.bet_amount > 0 ? `+${c.bet_amount} ${c.bet_currency === "gold" ? "ouro" : "prata"}` : ""}`
+                : "Você perdeu este desafio."}
+            </p>
+            <Button className="mt-3" onClick={onLeave}>Voltar ao lobby</Button>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-ink-faint">Velocidade</span>
+            {REPLAY_SPEEDS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSpeed(s)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-sm font-semibold tabular-nums transition-colors",
+                  speed === s ? "bg-brand text-black" : "bg-graphite text-ink-muted hover:text-ink",
+                )}
+              >
+                {s}x
+              </button>
+            ))}
+            <Button variant="subtle" size="sm" onClick={() => setRevealed(events.length)}>
+              <FastForward className="h-4 w-4" /> Resultado
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* Narração */}
+      <Card>
+        <p className="mb-2 text-sm font-semibold">
+          Narração — {myName} <span className="text-ink-faint">vs</span> {theirName}
+          {c.weather ? ` · clima ${c.weather}` : ""}
+        </p>
+        <div ref={logRef} className="max-h-80 space-y-1 overflow-y-auto pr-1 scroll-smooth">
+          {!hasEvents && <p className="text-ink-faint">Esta partida não tem narração registrada.</p>}
+          {shown
+            .filter((e) => e.event_type !== "point")
+            .map((e, i) => (
+              <p
+                key={i}
+                className={cn(
+                  "rounded px-2 py-1 text-sm",
+                  e.side === "info" && "text-ink-faint",
+                  e.event_type === "side_switch" && "italic text-ink-muted",
+                  /ACE|PONTO|BLOQUEIO/.test(e.text) && "bg-brand-muted/20 font-medium text-ink",
+                )}
+              >
+                {e.text}
+              </p>
+            ))}
+        </div>
+      </Card>
     </div>
   );
 }

@@ -10,14 +10,18 @@ from app.schemas.athlete import AthleteOut
 
 class AdminUser(BaseModel):
     user_id: uuid.UUID
+    email: str | None = None
     club_id: uuid.UUID | None = None
     club_name: str | None = None
+    club_city: str | None = None
     silver: int
     gold: int
     streak: int
     matches_played: int
     matches_won: int
     matches_lost: int
+    online_wins: int = 0
+    online_losses: int = 0
     athlete_count: int
     approved: bool = True
 

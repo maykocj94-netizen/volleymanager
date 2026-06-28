@@ -61,8 +61,9 @@ class OnlineService:
                 ).order_by(Challenge.updated_at.desc()).limit(1)
             )
         ).scalars().first()
-        # Só mostra "finished" recente (até 60s) como lobby ativo.
-        if rows and rows.status == "finished" and (_now() - _aware(rows.updated_at)).total_seconds() > 90:
+        # Mantém o "finished" recente como sala ativa (tempo para assistir à
+        # narração e ver o resultado). Depois disso, volta ao lobby sozinho.
+        if rows and rows.status == "finished" and (_now() - _aware(rows.updated_at)).total_seconds() > 600:
             return None
         return rows
 
@@ -281,6 +282,14 @@ class OnlineService:
         c.weather = weather.value if weather else None
         win_name = c.challenger_name if home_won else c.opponent_name
         c.result_text = f"{win_name} venceu por {result.home_sets} x {result.away_sets}"
+        # Guarda a narração para reprodução no cliente (challenger = "home").
+        c.events = [
+            {
+                "set_no": e.set_no, "rally_no": e.rally_no, "event_type": e.event_type,
+                "side": e.side, "text": e.text, "athlete": e.athlete,
+            }
+            for e in result.events
+        ]
         c.status = "finished"
         await self.session.flush()
 

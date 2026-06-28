@@ -1,4 +1,5 @@
 import type { Athlete } from "./athlete";
+import type { MatchEvent } from "./match";
 
 export interface OnlineUser {
   user_id: string;
@@ -39,6 +40,7 @@ export interface Challenge extends ChallengeBrief {
   score_away: number | null;
   weather: string | null;
   result_text: string | null;
+  events: MatchEvent[];
 }
 
 export interface Lobby {

@@ -260,6 +260,8 @@ export function useFinishMatch(clubId: string | undefined) {
     onSuccess: (res) => {
       qc.setQueryData(["me"], res.state);
       qc.invalidateQueries({ queryKey: ["athletes", "club", clubId] });
+      // Ao concluir, o servidor sorteia um novo adversário — recarrega o cenário.
+      qc.invalidateQueries({ queryKey: ["scenario"] });
     },
   });
 }

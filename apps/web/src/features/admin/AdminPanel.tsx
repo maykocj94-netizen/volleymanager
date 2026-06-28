@@ -45,8 +45,15 @@ import {
   useAdminUsers,
 } from "@/lib/admin";
 import { TournamentsPanel } from "./TournamentsPanel";
+import { ConditionBadge } from "@/features/squad/AthleteCard";
 
 type Tab = "contas" | "vendas" | "anuncios" | "torneios" | "loja";
+
+/** K/D = razão entre vitórias e derrotas. */
+function kd(won: number, lost: number): string {
+  if (lost === 0) return won > 0 ? won.toFixed(2) : "0.00";
+  return (won / lost).toFixed(2);
+}
 
 export function AdminPanel() {
   const navigate = useNavigate();
@@ -153,7 +160,8 @@ function UserRow({ user, active, onClick }: { user: AdminUser; active: boolean; 
           </span>
         )}
       </p>
-      <p className="truncate text-xs text-ink-faint">{user.user_id}</p>
+      <p className="truncate text-xs text-ink-muted">{user.email ?? "(e-mail não capturado)"}</p>
+      <p className="truncate text-[10px] text-ink-faint">{user.user_id}</p>
       <div className="mt-1 flex gap-3 text-xs text-ink-muted">
         <span>🥈 {user.silver}</span>
         <span>🥇 {user.gold}</span>
@@ -191,6 +199,46 @@ function UserDetail({ user }: { user: AdminUser }) {
           {user.approved ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
           {user.approved ? "Revogar acesso" : "Aprovar entrada"}
         </Button>
+      </Card>
+
+      {/* Login do usuário */}
+      <Card>
+        <p className="mb-2 font-semibold">Login do usuário</p>
+        <div className="space-y-1 text-sm">
+          <p>
+            <span className="text-ink-muted">E-mail: </span>
+            <b className="text-ink">{user.email ?? "—"}</b>
+            {!user.email && (
+              <span className="ml-2 text-xs text-ink-faint">
+                (aparece após o usuário abrir o jogo ao menos uma vez)
+              </span>
+            )}
+          </p>
+          <p className="text-ink-muted">
+            Senha: <b className="text-ink">não exibível</b> — fica criptografada no Supabase e não
+            pode ser recuperada. Se o usuário esquecer, use “Esqueci minha senha” na tela de login
+            ou um reset pelo painel do Supabase.
+          </p>
+          {user.club_city && (
+            <p className="text-ink-muted">Cidade: <b className="text-ink">{user.club_city}</b></p>
+          )}
+        </div>
+      </Card>
+
+      {/* Desempenho do painel do usuário */}
+      <Card>
+        <p className="mb-3 font-semibold">Desempenho</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <StatBox label="Partidas" value={user.matches_played} />
+          <StatBox label="Vitórias" value={user.matches_won} tone="text-emerald-400" />
+          <StatBox label="Derrotas" value={user.matches_lost} tone="text-red-400" />
+          <StatBox label="K/D" value={kd(user.matches_won, user.matches_lost)} tone="text-brand" />
+          <StatBox label="Online V" value={user.online_wins} tone="text-emerald-400" />
+          <StatBox label="Online D" value={user.online_losses} tone="text-red-400" />
+        </div>
+        <p className="mt-3 text-xs text-ink-faint">
+          🔥 Sequência de login: {user.streak} dia(s) · 👥 {user.athlete_count} atleta(s)
+        </p>
       </Card>
 
       {/* Moedas */}
@@ -734,9 +782,17 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
     <div className="rounded-lg border border-graphite-border bg-graphite/40">
       <div className="flex items-center gap-3 p-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">
-            {athlete.first_name} {athlete.last_name}{" "}
-            <span className="text-xs text-ink-faint">· {SEX_LABEL[athlete.sex]} · {POSITION_LABEL[pos] ?? pos}</span>
+          <p className="flex flex-wrap items-center gap-1.5 font-medium">
+            <span className="truncate">
+              {athlete.first_name} {athlete.last_name}{" "}
+              <span className="text-xs text-ink-faint">· {SEX_LABEL[athlete.sex]} · {POSITION_LABEL[pos] ?? pos}</span>
+            </span>
+            <ConditionBadge athlete={athlete} />
+            {athlete.expires_at && (
+              <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-bold text-purple-300" title="Atleta de contratação (anúncio)">
+                ⏳ anúncio
+              </span>
+            )}
           </p>
           <p className="text-xs text-ink-muted">CA {athlete.current_ability} · PA {athlete.potential_ability} · LVL {athlete.level}</p>
         </div>
@@ -765,6 +821,15 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatBox({ label, value, tone }: { label: string; value: number | string; tone?: string }) {
+  return (
+    <div className="rounded-lg bg-graphite px-2 py-1.5 text-center">
+      <p className={cn("text-lg font-bold tabular-nums", tone ?? "text-ink")}>{value}</p>
+      <p className="text-[10px] uppercase tracking-wide text-ink-faint">{label}</p>
     </div>
   );
 }

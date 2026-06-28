@@ -3,7 +3,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, Uuid, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -24,6 +24,8 @@ class UserState(Base):
     __tablename__ = "user_state"
 
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    # E-mail de login (capturado do JWT no /me) — exibido na central de contas.
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
     silver: Mapped[int] = mapped_column(Integer, default=STARTING_SILVER)
     gold: Mapped[int] = mapped_column(Integer, default=STARTING_GOLD)
     streak: Mapped[int] = mapped_column(Integer, default=0)

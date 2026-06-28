@@ -48,14 +48,18 @@ class AdminService:
                 ) or 0
             rows.append({
                 "user_id": st.user_id,
+                "email": st.email,
                 "club_id": club.id if club else None,
                 "club_name": club.name if club else None,
+                "club_city": club.city if club else None,
                 "silver": st.silver,
                 "gold": st.gold,
                 "streak": st.streak,
                 "matches_played": st.matches_played,
                 "matches_won": st.matches_won,
                 "matches_lost": st.matches_lost,
+                "online_wins": st.online_wins,
+                "online_losses": st.online_losses,
                 "athlete_count": int(count),
                 "approved": bool(st.approved),
             })

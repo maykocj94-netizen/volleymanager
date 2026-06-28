@@ -151,14 +151,18 @@ export interface MatchFinishResult {
 // --- Admin (central de contas) ---
 export interface AdminUser {
   user_id: string;
+  email: string | null;
   club_id: string | null;
   club_name: string | null;
+  club_city: string | null;
   silver: number;
   gold: number;
   streak: number;
   matches_played: number;
   matches_won: number;
   matches_lost: number;
+  online_wins: number;
+  online_losses: number;
   athlete_count: number;
   approved: boolean;
 }

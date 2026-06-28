@@ -3,9 +3,10 @@
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.athlete import AthleteOut
+from app.schemas.match import MatchEventOut
 
 
 class OnlineUserOut(BaseModel):
@@ -67,6 +68,13 @@ class ChallengeOut(BaseModel):
     score_away: int | None = None
     weather: str | None = None
     result_text: str | None = None
+    events: list[MatchEventOut] = []
+
+    @field_validator("events", mode="before")
+    @classmethod
+    def _ensure_events_list(cls, v: object) -> object:
+        # Linhas antigas migram a coluna JSON com DEFAULT '{}' (dict): normaliza.
+        return v if isinstance(v, list) else []
 
 
 class LobbyOut(BaseModel):
