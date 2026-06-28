@@ -8,6 +8,7 @@ import {
   Trophy,
   ShoppingBag,
   Dumbbell,
+  Ticket,
   CircleDot,
   LogOut,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const nav = [
   { to: "/competicoes", label: "Competições", short: "Torneios", icon: Trophy },
   { to: "/loja", label: "Loja", short: "Loja", icon: ShoppingBag },
   { to: "/ct", label: "Centro de Treino", short: "CT", icon: Dumbbell },
+  { to: "/apostas", label: "Apostas", short: "Apostas", icon: Ticket },
 ];
 
 export function AppLayout() {

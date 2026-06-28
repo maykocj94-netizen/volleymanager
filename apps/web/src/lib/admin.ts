@@ -5,6 +5,9 @@ import type {
   Athlete,
   HireListing,
   Modality,
+  Odd,
+  OddAdminDetail,
+  OddSelection,
   SaleRequest,
   StoreProduct,
   Tournament,
@@ -91,6 +94,21 @@ export const adminUpdateProduct = (id: string, body: Record<string, unknown>) =>
   adminApi<StoreProduct>(`/api/v1/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 export const adminDeleteProduct = (id: string) =>
   adminApi<{ ok: boolean }>(`/api/v1/admin/products/${id}`, { method: "DELETE" });
+
+// odds (apostas — só admin)
+export const adminListOdds = () => adminApi<Odd[]>("/api/v1/admin/odds");
+export const adminOddDetail = (id: string) =>
+  adminApi<OddAdminDetail>(`/api/v1/admin/odds/${id}`);
+export const adminCreateOdd = (body: Record<string, unknown>) =>
+  adminApi<Odd>("/api/v1/admin/odds", { method: "POST", body: JSON.stringify(body) });
+export const adminUpdateOdd = (id: string, body: Record<string, unknown>) =>
+  adminApi<Odd>(`/api/v1/admin/odds/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const adminSettleOdd = (id: string, winner: OddSelection) =>
+  adminApi<Odd>(`/api/v1/admin/odds/${id}/settle`, { method: "POST", body: JSON.stringify({ winner }) });
+export const adminCancelOdd = (id: string) =>
+  adminApi<Odd>(`/api/v1/admin/odds/${id}/cancel`, { method: "POST" });
+export const adminDeleteOdd = (id: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/odds/${id}`, { method: "DELETE" });
 
 // torneios
 export const adminListTournaments = () => adminApi<Tournament[]>("/api/v1/admin/tournaments");
@@ -385,5 +403,70 @@ export function useAdminDeleteProduct() {
       qc.setQueryData<StoreProduct[]>(["admin", "products"], (old) =>
         old?.filter((x) => x.id !== id),
       ),
+  });
+}
+
+// --- odds (apostas) ---
+export function useAdminOdds() {
+  return useQuery({ queryKey: ["admin", "odds"], queryFn: adminListOdds });
+}
+
+export function useAdminOddDetail(id: string | null) {
+  return useQuery({
+    queryKey: ["admin", "odd", id],
+    queryFn: () => adminOddDetail(id!),
+    enabled: !!id,
+  });
+}
+
+export function useAdminCreateOdd() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => adminCreateOdd(body),
+    onSuccess: (o) => qc.setQueryData<Odd[]>(["admin", "odds"], (old) => [o, ...(old ?? [])]),
+  });
+}
+
+export function useAdminUpdateOdd() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; body: Record<string, unknown> }) => adminUpdateOdd(v.id, v.body),
+    onSuccess: (o) =>
+      qc.setQueryData<Odd[]>(["admin", "odds"], (old) => old?.map((x) => (x.id === o.id ? o : x))),
+  });
+}
+
+export function useAdminSettleOdd() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; winner: OddSelection }) => adminSettleOdd(v.id, v.winner),
+    onSuccess: (o) => {
+      qc.setQueryData<Odd[]>(["admin", "odds"], (old) => old?.map((x) => (x.id === o.id ? o : x)));
+      qc.invalidateQueries({ queryKey: ["admin", "odd", o.id] });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] }); // pagou os vencedores
+    },
+  });
+}
+
+export function useAdminCancelOdd() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminCancelOdd(id),
+    onSuccess: (o) => {
+      qc.setQueryData<Odd[]>(["admin", "odds"], (old) => old?.map((x) => (x.id === o.id ? o : x)));
+      qc.invalidateQueries({ queryKey: ["admin", "odd", o.id] });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] }); // devolveu apostas
+    },
+  });
+}
+
+export function useAdminDeleteOdd() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminDeleteOdd(id),
+    onSuccess: (_res, id) => {
+      qc.setQueryData<Odd[]>(["admin", "odds"], (old) => old?.filter((x) => x.id !== id));
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
   });
 }

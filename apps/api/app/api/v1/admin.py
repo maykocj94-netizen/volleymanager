@@ -20,6 +20,14 @@ from app.schemas.market import (
     HireListingUpdate,
     SaleRequestOut,
 )
+from app.schemas.odd import (
+    OddAdminDetailOut,
+    OddBetAdminOut,
+    OddCreate,
+    OddOut,
+    OddUpdate,
+    SettleRequest,
+)
 from app.schemas.store import ProductCreate, ProductOut, ProductUpdate
 from app.schemas.tournament import (
     MatchResultRequest,
@@ -32,6 +40,7 @@ from app.schemas.tournament import (
 from app.services.admin_service import AdminService
 from app.services.market_service import expire_due
 from app.services.sales_service import SalesService
+from app.services.odd_service import OddAdminService, OddError
 from app.services.store_service import StoreAdminService, StoreError
 from app.services.tournament_service import NotFound as TournamentNotFound
 from app.services.tournament_service import TournamentError, TournamentService
@@ -199,11 +208,13 @@ async def _tour_detail(svc: TournamentService, tid: uuid.UUID) -> TournamentDeta
     t = await svc.get(tid)
     entries = await svc.get_entries(tid)
     matches = await svc.get_matches(tid)
+    athletes = await svc.entry_athletes(entries)
     return TournamentDetailOut(
         tournament=TournamentOut(**svc._tour_dict(t, len(entries))),
         entries=[TournamentEntryOut.model_validate(e) for e in entries],
         matches=[TournamentMatchOut.model_validate(m) for m in matches],
         my_entry_id=None,
+        athletes={aid: AthleteOut.model_validate(a) for aid, a in athletes.items()},
     )
 
 
@@ -338,6 +349,86 @@ async def admin_delete_product(
 ) -> dict[str, bool]:
     try:
         await StoreAdminService(session).delete_product(product_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+# --- Odds (apostas — só admin) --------------------------------------------
+@router.get("/odds", response_model=list[OddOut])
+async def admin_list_odds(session: DbSession, _admin: AdminAuth) -> list[OddOut]:
+    rows = await OddAdminService(session).list_odds()
+    return [OddOut(**r) for r in rows]
+
+
+@router.get("/odds/{odd_id}", response_model=OddAdminDetailOut)
+async def admin_odd_detail(
+    odd_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> OddAdminDetailOut:
+    try:
+        odd, bets, count = await OddAdminService(session).get_detail(odd_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.services.odd_service import _odd_dict
+    return OddAdminDetailOut(
+        odd=OddOut(**_odd_dict(odd, count)),
+        bets=[OddBetAdminOut.model_validate(b) for b in bets],
+    )
+
+
+@router.post("/odds", response_model=OddOut, status_code=201)
+async def admin_create_odd(
+    body: OddCreate, session: DbSession, _admin: AdminAuth
+) -> OddOut:
+    row = await OddAdminService(session).create(body.model_dump())
+    return OddOut(**row)
+
+
+@router.patch("/odds/{odd_id}", response_model=OddOut)
+async def admin_update_odd(
+    odd_id: uuid.UUID, body: OddUpdate, session: DbSession, _admin: AdminAuth
+) -> OddOut:
+    try:
+        row = await OddAdminService(session).update(odd_id, body.model_dump(exclude_unset=True))
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OddError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return OddOut(**row)
+
+
+@router.post("/odds/{odd_id}/settle", response_model=OddOut)
+async def admin_settle_odd(
+    odd_id: uuid.UUID, body: SettleRequest, session: DbSession, _admin: AdminAuth
+) -> OddOut:
+    try:
+        row = await OddAdminService(session).settle(odd_id, body.winner)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OddError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return OddOut(**row)
+
+
+@router.post("/odds/{odd_id}/cancel", response_model=OddOut)
+async def admin_cancel_odd(
+    odd_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> OddOut:
+    try:
+        row = await OddAdminService(session).cancel(odd_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OddError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return OddOut(**row)
+
+
+@router.delete("/odds/{odd_id}")
+async def admin_delete_odd(
+    odd_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> dict[str, bool]:
+    try:
+        await OddAdminService(session).delete(odd_id)
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"ok": True}

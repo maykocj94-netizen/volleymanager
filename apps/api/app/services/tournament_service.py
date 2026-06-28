@@ -108,6 +108,22 @@ class TournamentService:
             raise NotFound("Torneio não encontrado.")
         return t
 
+    async def entry_athletes(self, entries: list[TournamentEntry]) -> dict[str, Athlete]:
+        """Mapa { athlete_id: Athlete } de todos os atletas inscritos nas entries."""
+        repo = AthleteRepository(self.session)
+        out: dict[str, Athlete] = {}
+        for e in entries:
+            for aid in (e.athlete_ids or []):
+                if aid in out:
+                    continue
+                try:
+                    a = await repo.get(uuid.UUID(str(aid)))
+                except ValueError:
+                    a = None
+                if a is not None:
+                    out[str(aid)] = a
+        return out
+
     def _tour_dict(self, t: Tournament, entry_count: int) -> dict:
         return {
             "id": t.id, "title": t.title, "subtitle": t.subtitle, "image_url": t.image_url,

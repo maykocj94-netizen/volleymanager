@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield,
-  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag, UserCog, Clock,
+  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag, UserCog, Clock, Ticket,
 } from "lucide-react";
 import {
   ATTRIBUTE_LABEL,
@@ -45,9 +45,10 @@ import {
   useAdminUsers,
 } from "@/lib/admin";
 import { TournamentsPanel } from "./TournamentsPanel";
+import { OddsPanel } from "./OddsPanel";
 import { ConditionBadge } from "@/features/squad/AthleteCard";
 
-type Tab = "contas" | "vendas" | "anuncios" | "torneios" | "loja";
+type Tab = "contas" | "vendas" | "anuncios" | "torneios" | "loja" | "odd";
 
 /** K/D = razão entre vitórias e derrotas. */
 function kd(won: number, lost: number): string {
@@ -119,6 +120,9 @@ export function AdminPanel() {
         <TabBtn active={tab === "loja"} onClick={() => setTab("loja")}>
           <ShoppingBag className="h-4 w-4" /> Loja
         </TabBtn>
+        <TabBtn active={tab === "odd"} onClick={() => setTab("odd")}>
+          <Ticket className="h-4 w-4" /> Odd
+        </TabBtn>
       </div>
 
       {tab === "contas" && <AccountsPanel focusUserId={focusUserId} />}
@@ -126,6 +130,7 @@ export function AdminPanel() {
       {tab === "anuncios" && <ListingsPanel onViewAccount={viewAccount} />}
       {tab === "torneios" && <TournamentsPanel />}
       {tab === "loja" && <ProductsPanel />}
+      {tab === "odd" && <OddsPanel />}
     </div>
   );
 }

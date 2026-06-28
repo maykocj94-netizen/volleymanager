@@ -5,3 +5,4 @@ export * from "./user";
 export * from "./tournament";
 export * from "./online";
 export * from "./store";
+export * from "./odd";

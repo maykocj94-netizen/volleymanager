@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, HTTPException
 
 from app.core.deps import CurrentUser, DbSession
+from app.schemas.athlete import AthleteOut
 from app.schemas.tournament import (
     RegisterRequest,
     TournamentDetailOut,
@@ -23,11 +24,13 @@ async def _detail(svc: TournamentService, tid: uuid.UUID, user_id: uuid.UUID) ->
     entries = await svc.get_entries(tid)
     matches = await svc.get_matches(tid)
     mine = await svc.my_entry(user_id, tid)
+    athletes = await svc.entry_athletes(entries)
     return TournamentDetailOut(
         tournament=TournamentOut(**svc._tour_dict(t, len(entries))),
         entries=[TournamentEntryOut.model_validate(e) for e in entries],
         matches=[TournamentMatchOut.model_validate(m) for m in matches],
         my_entry_id=mine.id if mine else None,
+        athletes={aid: AthleteOut.model_validate(a) for aid, a in athletes.items()},
     )
 
 

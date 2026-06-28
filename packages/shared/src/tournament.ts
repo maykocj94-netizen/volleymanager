@@ -58,6 +58,7 @@ export interface TournamentDetail {
   entries: TournamentEntry[];
   matches: TournamentMatch[];
   my_entry_id: string | null;
+  athletes: Record<string, import("./athlete").Athlete>;
 }
 
 export const TOURNAMENT_TYPE_LABEL: Record<TournamentType, string> = {

@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.athlete import AthleteOut
+
 
 class TournamentOut(BaseModel):
     id: uuid.UUID
@@ -87,6 +89,8 @@ class TournamentDetailOut(BaseModel):
     entries: list[TournamentEntryOut]
     matches: list[TournamentMatchOut]
     my_entry_id: uuid.UUID | None = None
+    # Atletas inscritos (por id) para ver o card de cada um na gestão do torneio.
+    athletes: dict[str, AthleteOut] = {}
 
 
 class RegisterRequest(BaseModel):

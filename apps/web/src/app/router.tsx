@@ -7,6 +7,7 @@ import { MarketPage } from "@/features/market/MarketPage";
 import { StorePage } from "@/features/store/StorePage";
 import { CtPage } from "@/features/ct/CtPage";
 import { CompetitionsPage } from "@/features/competitions/CompetitionsPage";
+import { OddsPage } from "@/features/odds/OddsPage";
 import { OnlineMatchPage } from "@/features/online/OnlineMatchPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { AuthGate } from "@/features/auth/AuthGate";
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: "competicoes", element: <CompetitionsPage /> },
       { path: "loja", element: <StorePage /> },
       { path: "ct", element: <CtPage /> },
+      { path: "apostas", element: <OddsPage /> },
     ],
   },
 ]);

@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { ArrowLeft, Loader2, Play, Plus, Save, Trash2, Flag } from "lucide-react";
+import { ArrowLeft, Loader2, Play, Plus, Save, Trash2, Flag, Users2 } from "lucide-react";
 import {
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_TYPE_LABEL,
+  type Athlete,
+  type TournamentEntry,
   type TournamentMatch,
   type TournamentType,
 } from "@volley/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { AthleteDetail } from "@/features/squad/AthleteCard";
 import {
   useAdminAdvancePhase,
   useAdminCreateTournament,
@@ -176,12 +179,14 @@ function Manage({ id, onBack }: { id: string; onBack: () => void }) {
   const start = useAdminStartTournament(id);
   const advance = useAdminAdvancePhase(id);
   const finish = useAdminFinishTournament(id);
+  const [detail, setDetail] = useState<Athlete | null>(null);
   if (isLoading || !data) return <Spinner />;
   const t = data.tournament;
   const canAdvance = t.status === "running" && (t.type === "groups" || t.type === "repechage");
 
   return (
     <div className="space-y-5">
+      {detail && <AthleteDetail athlete={detail} onClose={() => setDetail(null)} />}
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" /> Voltar aos torneios
       </button>
@@ -220,21 +225,22 @@ function Manage({ id, onBack }: { id: string; onBack: () => void }) {
         <Card className="text-sm text-emerald-400">🏆 Torneio finalizado e premiação creditada!</Card>
       )}
 
-      {/* Times / classificação */}
+      {/* Times / classificação + atletas inscritos */}
       <Card>
         <p className="mb-2 font-semibold">Times inscritos ({data.entries.length})</p>
-        <div className="grid gap-1.5 sm:grid-cols-2">
+        <p className="mb-3 text-xs text-ink-faint">
+          Clique num time para ver os atletas escalados e o card de cada um.
+        </p>
+        <div className="space-y-1.5">
           {data.entries
             .slice()
             .sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99) || b.points - a.points)
             .map((e) => (
-              <div key={e.id} className="flex items-center justify-between rounded bg-graphite px-3 py-1.5 text-sm">
-                <span>{e.team_name}</span>
-                <span className="text-xs text-ink-muted">
-                  {e.placement ? `${e.placement}º · ` : ""}{e.points} pts · {e.wins}V/{e.losses}D
-                </span>
-              </div>
+              <EntryRow key={e.id} entry={e} athletes={data.athletes} onPick={setDetail} />
             ))}
+          {data.entries.length === 0 && (
+            <p className="text-sm text-ink-muted">Nenhum time inscrito ainda.</p>
+          )}
         </div>
       </Card>
 
@@ -248,6 +254,57 @@ function Manage({ id, onBack }: { id: string; onBack: () => void }) {
             ))}
           </div>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function EntryRow({
+  entry: e,
+  athletes,
+  onPick,
+}: {
+  entry: TournamentEntry;
+  athletes: Record<string, Athlete>;
+  onPick: (a: Athlete) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ath = (e.athlete_ids ?? []).map((id) => athletes[id]).filter(Boolean) as Athlete[];
+  return (
+    <div className="rounded-lg border border-graphite-border bg-graphite/40">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm"
+      >
+        <span className="flex items-center gap-2 font-medium">
+          <Users2 className="h-4 w-4 text-brand" /> {e.team_name}
+          <span className="rounded bg-graphite px-1.5 py-0.5 text-[10px] text-ink-muted">{ath.length} atleta(s)</span>
+        </span>
+        <span className="flex items-center gap-2 text-xs text-ink-muted">
+          {e.placement ? `${e.placement}º · ` : ""}{e.points} pts · {e.wins}V/{e.losses}D
+          <span>{open ? "▲" : "▼"}</span>
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-graphite-border p-2">
+          {ath.length === 0 ? (
+            <p className="px-1 py-1 text-xs text-ink-faint">Atletas indisponíveis (podem ter expirado/saído).</p>
+          ) : (
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {ath.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => onPick(a)}
+                  className="flex items-center justify-between rounded bg-graphite px-3 py-2 text-left text-sm hover:bg-graphite-light"
+                  title="Ver card de estatísticas e habilidades"
+                >
+                  <span className="truncate">{a.first_name} {a.last_name}</span>
+                  <span className="ml-2 shrink-0 text-xs text-ink-muted">CA {a.current_ability} · LVL {a.level} · ⓘ</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
