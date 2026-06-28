@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield,
-  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag,
+  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag, UserCog, Clock,
 } from "lucide-react";
 import {
   ATTRIBUTE_LABEL,
@@ -55,9 +55,23 @@ function kd(won: number, lost: number): string {
   return (won / lost).toFixed(2);
 }
 
+/** Dias inteiros restantes até `expires_at` (negativo/0 = já expirado). */
+function daysLeft(expiresAt: string | null): number | null {
+  if (!expiresAt) return null;
+  return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
+}
+
+function expiryLabel(days: number | null): string {
+  if (days == null) return "";
+  if (days <= 0) return "expira hoje";
+  if (days === 1) return "expira em 1 dia";
+  return `expira em ${days} dias`;
+}
+
 export function AdminPanel() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("contas");
+  const [focusUserId, setFocusUserId] = useState<string | null>(null);
   const { data: sales } = useAdminSales();
   const { data: users } = useAdminUsers();
   const pendingUsers = (users ?? []).filter((u) => !u.approved).length;
@@ -65,6 +79,13 @@ export function AdminPanel() {
   function logout() {
     clearAdminToken();
     navigate("/login", { replace: true });
+  }
+
+  /** Abre a aba Contas já focando o usuário (ex.: contratante de um anúncio). */
+  function viewAccount(userId: string) {
+    setFocusUserId(userId);
+    setTab("contas");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
@@ -100,9 +121,9 @@ export function AdminPanel() {
         </TabBtn>
       </div>
 
-      {tab === "contas" && <AccountsPanel />}
+      {tab === "contas" && <AccountsPanel focusUserId={focusUserId} />}
       {tab === "vendas" && <SalesPanel />}
-      {tab === "anuncios" && <ListingsPanel />}
+      {tab === "anuncios" && <ListingsPanel onViewAccount={viewAccount} />}
       {tab === "torneios" && <TournamentsPanel />}
       {tab === "loja" && <ProductsPanel />}
     </div>
@@ -110,9 +131,13 @@ export function AdminPanel() {
 }
 
 // ====================== CONTAS ======================
-function AccountsPanel() {
+function AccountsPanel({ focusUserId }: { focusUserId: string | null }) {
   const { data: users, isLoading, isError } = useAdminUsers();
   const [selId, setSelId] = useState<string | null>(null);
+  // Quando vier um foco (ex.: "Ver conta" de um anúncio), seleciona aquele usuário.
+  useEffect(() => {
+    if (focusUserId) setSelId(focusUserId);
+  }, [focusUserId]);
   const selected = users?.find((u) => u.user_id === selId) ?? users?.[0] ?? null;
 
   if (isError) {
@@ -331,11 +356,19 @@ function SalesPanel() {
 }
 
 // ====================== ANÚNCIOS (criação personalizada) ======================
-function ListingsPanel() {
+function ListingsPanel({ onViewAccount }: { onViewAccount: (userId: string) => void }) {
   const { data: listings, isLoading } = useAdminListings();
+  const { data: users } = useAdminUsers();
   const republish = useAdminRepublishListing();
   const del = useAdminDeleteListing();
   const [editing, setEditing] = useState<HireListing | null>(null);
+
+  /** Rótulo do contratante (clube/e-mail/id) a partir de hired_by. */
+  function buyerLabel(userId: string): string {
+    const u = users?.find((x) => x.user_id === userId);
+    if (!u) return `${userId.slice(0, 8)}…`;
+    return u.club_name || u.email || `${userId.slice(0, 8)}…`;
+  }
 
   return (
     <div className="space-y-5">
@@ -353,9 +386,10 @@ function ListingsPanel() {
             {listings.map((li) => {
               const both = !!li.beach_position && !!li.court_position;
               const disc = both ? "🏖️🏐 Ambos" : li.beach_position ? "🏖️ Praia" : "🏐 Quadra";
+              const days = daysLeft(li.expires_at);
               return (
                 <Card key={li.id} className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="flex items-center gap-2 font-semibold">
                       {li.first_name} {li.last_name}
                       <StatusBadge status={li.status} />
@@ -364,8 +398,38 @@ function ListingsPanel() {
                       {disc} · {SEX_LABEL[li.sex]} · {li.age}a · CA {li.current_ability} · 🥈 {li.price.toLocaleString("pt-BR")}
                       {li.price_gold > 0 && ` · 🥇 ${li.price_gold.toLocaleString("pt-BR")}`} · validade {li.availability_days}d
                     </p>
+
+                    {/* Contratante + contagem regressiva da contratação */}
+                    {li.hired_by && (
+                      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <span className="text-ink-muted">
+                          Contratado por <b className="text-ink">{buyerLabel(li.hired_by)}</b>
+                        </span>
+                        {li.status === "hired" && days != null && (
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 font-semibold",
+                              days <= 2 ? "text-red-400" : days <= 5 ? "text-amber-400" : "text-ink-muted",
+                            )}
+                          >
+                            <Clock className="h-3 w-3" /> {expiryLabel(days)}
+                          </span>
+                        )}
+                        {li.status === "expired" && (
+                          <span className="inline-flex items-center gap-1 font-semibold text-amber-400">
+                            <Hourglass className="h-3 w-3" /> contrato expirado
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex gap-2">
+
+                  <div className="flex flex-wrap gap-2">
+                    {li.hired_by && (
+                      <Button size="sm" variant="outline" onClick={() => onViewAccount(li.hired_by!)}>
+                        <UserCog className="h-4 w-4" /> Ver conta
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="subtle"

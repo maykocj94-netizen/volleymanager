@@ -30,6 +30,7 @@ from app.schemas.tournament import (
     TournamentOut,
 )
 from app.services.admin_service import AdminService
+from app.services.market_service import expire_due
 from app.services.sales_service import SalesService
 from app.services.store_service import StoreAdminService, StoreError
 from app.services.tournament_service import NotFound as TournamentNotFound
@@ -140,6 +141,9 @@ async def reject_sale(
 # --- Anúncios de contratação (criação personalizada — só admin) -----------
 @router.get("/listings", response_model=list[HireListingOut])
 async def list_listings(session: DbSession, _admin: AdminAuth) -> list[HireListingOut]:
+    # Marca como "expired" os anúncios cujo contrato venceu (e remove o atleta),
+    # mesmo que o comprador ainda não tenha reaberto o jogo.
+    await expire_due(session)
     listings = await AdminService(session).list_listings()
     return [HireListingOut.model_validate(li) for li in listings]
 
