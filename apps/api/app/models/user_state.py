@@ -18,6 +18,8 @@ LOGIN_STREAK_BONUS = 3000
 # Troca de cenário da partida (dificuldade/clima): 3 grátis por semana, depois custa.
 SCENARIO_FREE_REROLLS = 3
 SCENARIO_REROLL_COST = 200
+# Câmbio da Loja: 1 ouro vale esta quantidade de prata (nas duas direções).
+SILVER_PER_GOLD = 10
 
 
 class UserState(Base):

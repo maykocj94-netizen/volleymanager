@@ -12,6 +12,7 @@ from app.models.user_state import (
     LOGIN_STREAK_BONUS,
     LOGIN_STREAK_TARGET,
     REVELATION_MAX_ABILITY,
+    SILVER_PER_GOLD,
     UserState,
 )
 from app.repositories.athlete_repo import AthleteRepository
@@ -25,6 +26,10 @@ class InsufficientFunds(Exception):
 
 class NotFound(Exception):
     """Recurso inexistente ou não pertence ao jogador."""
+
+
+class ExchangeError(Exception):
+    """Parâmetros inválidos no câmbio de moedas (ex.: abaixo do mínimo)."""
 
 
 class UserService:
@@ -94,6 +99,48 @@ class UserService:
         )
         state.silver -= HIRE_COST
         return athletes[0], state
+
+    async def exchange(
+        self, user_id: uuid.UUID, direction: str, amount: int
+    ) -> tuple[UserState, int, int]:
+        """Câmbio entre moedas (1 ouro = SILVER_PER_GOLD prata, nas duas direções).
+
+        - ``to_silver``: gasta ``amount`` de OURO e recebe ``amount * 10`` de prata.
+        - ``to_gold``:   gasta PRATA e recebe ``amount // 10`` de ouro (mín. 10 prata).
+          Converte só múltiplos de 10; a sobra (< 10) permanece na carteira.
+
+        Devolve (state, silver_delta, gold_delta).
+        """
+        rate = SILVER_PER_GOLD
+        if amount <= 0:
+            raise ExchangeError("Informe uma quantidade maior que zero.")
+        state = await self.repo.get_or_create_state(user_id)
+
+        if direction == "to_silver":
+            gold_spent = amount
+            if state.gold < gold_spent:
+                raise InsufficientFunds(
+                    f"Precisa de {gold_spent} de ouro (tem {state.gold})."
+                )
+            silver_gained = gold_spent * rate
+            state.gold -= gold_spent
+            state.silver += silver_gained
+            return state, silver_gained, -gold_spent
+
+        if direction == "to_gold":
+            gold_gained = amount // rate
+            if gold_gained < 1:
+                raise ExchangeError(f"O mínimo é {rate} de prata (= 1 ouro).")
+            silver_spent = gold_gained * rate
+            if state.silver < silver_spent:
+                raise InsufficientFunds(
+                    f"Precisa de {silver_spent} de prata (tem {state.silver})."
+                )
+            state.silver -= silver_spent
+            state.gold += gold_gained
+            return state, -silver_spent, gold_gained
+
+        raise ExchangeError("Direção de câmbio inválida.")
 
     async def record_match_result(
         self, user_id: uuid.UUID, won: bool, athlete_ids: list[uuid.UUID]

@@ -77,6 +77,20 @@ class AthleteIdRequest(BaseModel):
     athlete_id: uuid.UUID
 
 
+class ExchangeRequest(BaseModel):
+    """Câmbio de moedas na Loja (1 ouro = 10 prata)."""
+
+    direction: Literal["to_silver", "to_gold"]
+    # to_silver: 'amount' = ouro a gastar. to_gold: 'amount' = prata a converter.
+    amount: int = Field(ge=1)
+
+
+class ExchangeResult(BaseModel):
+    state: UserStateOut
+    silver_delta: int
+    gold_delta: int
+
+
 class SignResult(BaseModel):
     athlete: AthleteOut
     state: UserStateOut

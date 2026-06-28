@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, ShoppingBag, Dumbbell, Coins } from "lucide-react";
-import type { Currency, StoreProduct } from "@volley/shared";
+import { Loader2, ShoppingBag, Dumbbell, Coins, ArrowRightLeft, ArrowRight } from "lucide-react";
+import { SILVER_PER_GOLD, type Currency, type StoreProduct } from "@volley/shared";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/game";
-import { useBuyProduct, useProducts } from "@/lib/store";
+import { useBuyProduct, useExchange, useProducts } from "@/lib/store";
 
 export function StorePage() {
   const { data: products, isLoading, isError } = useProducts();
@@ -37,6 +37,8 @@ export function StorePage() {
         </p>
       </Card>
 
+      <ExchangeCard />
+
       {isError ? (
         <Card className="text-ink-muted">
           Não foi possível carregar a loja. Verifique sua conexão.
@@ -55,6 +57,144 @@ export function StorePage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ExchangeCard() {
+  const { data: me } = useMe();
+  const exchange = useExchange();
+  const [goldIn, setGoldIn] = useState("");
+  const [silverIn, setSilverIn] = useState("");
+
+  const silver = me?.silver ?? 0;
+  const gold = me?.gold ?? 0;
+
+  // "Moedas de Prata": gasta ouro → recebe ouro × 10 de prata.
+  const goldAmt = Math.max(0, Math.floor(Number(goldIn) || 0));
+  const silverOut = goldAmt * SILVER_PER_GOLD;
+  const canBuySilver = goldAmt >= 1 && gold >= goldAmt;
+
+  // "Moedas de Ouro": gasta prata → recebe prata ÷ 10 de ouro (mín. 10 prata).
+  const silverAmt = Math.max(0, Math.floor(Number(silverIn) || 0));
+  const goldOut = Math.floor(silverAmt / SILVER_PER_GOLD);
+  const silverCost = goldOut * SILVER_PER_GOLD;
+  const canBuyGold = goldOut >= 1 && silver >= silverCost;
+
+  function buySilver() {
+    if (!canBuySilver) return;
+    exchange.mutate(
+      { direction: "to_silver", amount: goldAmt },
+      { onSuccess: () => setGoldIn("") },
+    );
+  }
+  function buyGold() {
+    if (!canBuyGold) return;
+    exchange.mutate(
+      { direction: "to_gold", amount: silverAmt },
+      { onSuccess: () => setSilverIn("") },
+    );
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-lg font-bold">
+          <ArrowRightLeft className="h-5 w-5 text-brand" /> Câmbio de Moedas
+        </h2>
+        <p className="text-xs text-ink-faint">
+          Cotação: <b className="text-ink-muted">1 🥇 = {SILVER_PER_GOLD} 🥈</b> · Saldo:{" "}
+          🥈 {silver.toLocaleString("pt-BR")} · 🥇 {gold.toLocaleString("pt-BR")}
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {/* Moedas de Prata: paga em ouro */}
+        <div className="rounded-lg border border-graphite-border bg-graphite/40 p-4">
+          <p className="font-semibold">🥈 Moedas de Prata</p>
+          <p className="mb-3 text-xs text-ink-faint">Gaste ouro e receba 10× em prata.</p>
+          <label className="text-xs text-ink-muted">Ouro a trocar</label>
+          <input
+            type="number"
+            min={1}
+            value={goldIn}
+            onChange={(e) => setGoldIn(e.target.value)}
+            placeholder="ex.: 20"
+            className="input mt-1"
+          />
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <span className="text-ink-muted">🥇 {goldAmt || 0}</span>
+            <ArrowRight className="h-4 w-4 text-ink-faint" />
+            <span className="font-bold text-emerald-400">🥈 {silverOut.toLocaleString("pt-BR")}</span>
+          </div>
+          <Button
+            className="mt-3 w-full"
+            size="sm"
+            onClick={buySilver}
+            disabled={exchange.isPending || !canBuySilver}
+            title={canBuySilver ? "" : "Ouro insuficiente / informe um valor"}
+          >
+            {exchange.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "🥈"}
+            Confirmar troca
+          </Button>
+        </div>
+
+        {/* Moedas de Ouro: paga em prata */}
+        <div className="rounded-lg border border-graphite-border bg-graphite/40 p-4">
+          <p className="font-semibold">🥇 Moedas de Ouro</p>
+          <p className="mb-3 text-xs text-ink-faint">
+            Gaste prata e receba ouro (mín. {SILVER_PER_GOLD} 🥈 = 1 🥇).
+          </p>
+          <label className="text-xs text-ink-muted">Prata a trocar</label>
+          <input
+            type="number"
+            min={SILVER_PER_GOLD}
+            value={silverIn}
+            onChange={(e) => setSilverIn(e.target.value)}
+            placeholder="ex.: 200"
+            className="input mt-1"
+          />
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <span className="text-ink-muted">🥈 {silverAmt || 0}</span>
+            <ArrowRight className="h-4 w-4 text-ink-faint" />
+            <span className="font-bold text-amber-400">🥇 {goldOut.toLocaleString("pt-BR")}</span>
+          </div>
+          {silverAmt > 0 && silverAmt !== silverCost && goldOut >= 1 && (
+            <p className="mt-1 text-[11px] text-ink-faint">
+              Serão usados {silverCost} 🥈 (o resto, {silverAmt - silverCost} 🥈, fica na carteira).
+            </p>
+          )}
+          <Button
+            className="mt-3 w-full"
+            size="sm"
+            variant="subtle"
+            onClick={buyGold}
+            disabled={exchange.isPending || !canBuyGold}
+            title={canBuyGold ? "" : `Mínimo ${SILVER_PER_GOLD} de prata`}
+          >
+            {exchange.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "🥇"}
+            Confirmar troca
+          </Button>
+        </div>
+      </div>
+
+      {exchange.isError && (
+        <p className="text-sm text-red-400">
+          Não foi possível concluir a troca. Verifique o saldo e o valor mínimo.
+        </p>
+      )}
+      {exchange.isSuccess && exchange.data && (
+        <p className="text-sm text-emerald-400">
+          Troca concluída!{" "}
+          {exchange.data.silver_delta >= 0
+            ? `+${exchange.data.silver_delta} 🥈`
+            : `${exchange.data.silver_delta} 🥈`}{" "}
+          ·{" "}
+          {exchange.data.gold_delta >= 0
+            ? `+${exchange.data.gold_delta} 🥇`
+            : `${exchange.data.gold_delta} 🥇`}
+        </p>
+      )}
+    </Card>
   );
 }
 

@@ -95,3 +95,15 @@ export interface BuildResult {
   inventory: InventoryItem[];
   message: string;
 }
+
+// --- Câmbio de moedas (1 ouro = 10 prata) ---
+/** to_silver: gasta ouro → recebe prata. to_gold: gasta prata → recebe ouro. */
+export type ExchangeDirection = "to_silver" | "to_gold";
+
+export const SILVER_PER_GOLD = 10;
+
+export interface ExchangeResult {
+  state: UserState;
+  silver_delta: number;
+  gold_delta: number;
+}

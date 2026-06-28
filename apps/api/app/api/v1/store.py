@@ -15,7 +15,11 @@ from app.schemas.store import (
     InventoryItemOut,
     ProductOut,
 )
+from app.schemas.user import ExchangeRequest, ExchangeResult
 from app.services.store_service import InsufficientFunds, NotFound, StoreError, StoreService
+from app.services.user_service import ExchangeError
+from app.services.user_service import InsufficientFunds as WalletInsufficientFunds
+from app.services.user_service import UserService
 
 router = APIRouter(prefix="/store", tags=["store"])
 
@@ -59,6 +63,26 @@ async def buy_product(body: BuyRequest, session: DbSession, user: CurrentUser) -
         inventory=[InventoryItemOut(**i) for i in inventory],
         granted_item=product.item_type,
         granted_qty=product.quantity,
+    )
+
+
+@router.post("/exchange", response_model=ExchangeResult)
+async def exchange_currency(
+    body: ExchangeRequest, session: DbSession, user: CurrentUser
+) -> ExchangeResult:
+    """Câmbio de moedas: prata ↔ ouro (1 ouro = 10 prata)."""
+    uid = uuid.UUID(user.id)
+    try:
+        state, silver_delta, gold_delta = await UserService(session).exchange(
+            uid, body.direction, body.amount
+        )
+    except ExchangeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except WalletInsufficientFunds as exc:
+        raise HTTPException(status_code=402, detail=str(exc)) from exc
+    club = await UserRepository(session).get_main_club(uid)
+    return ExchangeResult(
+        state=_state_out(state, club), silver_delta=silver_delta, gold_delta=gold_delta
     )
 
 
