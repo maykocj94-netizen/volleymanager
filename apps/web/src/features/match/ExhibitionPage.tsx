@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { FastForward, Play, RefreshCw, RotateCcw, Timer, Trophy, Users2 } from "lucide-react";
 import {
   SCENARIO_REROLL_COST,
@@ -90,6 +91,7 @@ export function ExhibitionPage() {
   const { data: scenario } = useScenario(kind, sexParam);
   const reroll = useReroll(kind, sexParam);
   const finishMatch = useFinishMatch(club?.id);
+  const qc = useQueryClient();
 
   const [result, setResult] = useState<MatchResult | null>(null);
   const [matchCpu, setMatchCpu] = useState<CpuInfo | null>(null);
@@ -200,6 +202,8 @@ export function ExhibitionPage() {
     setMatchCpu(null);
     setTimeline([]);
     setRevealed(0);
+    // Só agora revela o novo adversário (sorteado no servidor ao concluir).
+    qc.invalidateQueries({ queryKey: ["scenario"] });
   }
 
   const awayName = matchCpu?.team_name ?? scenario?.cpu_team ?? "CPU Rivais";

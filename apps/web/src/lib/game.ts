@@ -260,8 +260,9 @@ export function useFinishMatch(clubId: string | undefined) {
     onSuccess: (res) => {
       qc.setQueryData(["me"], res.state);
       qc.invalidateQueries({ queryKey: ["athletes", "club", clubId] });
-      // Ao concluir, o servidor sorteia um novo adversário — recarrega o cenário.
-      qc.invalidateQueries({ queryKey: ["scenario"] });
+      // NÃO recarrega o cenário aqui: o adversário recém-enfrentado continua na
+      // tela durante o resultado. O novo (já sorteado no servidor) só aparece ao
+      // clicar em "Nova partida" (ExhibitionPage chama invalidate em reset()).
     },
   });
 }
