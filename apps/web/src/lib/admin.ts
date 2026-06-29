@@ -54,6 +54,8 @@ export const adminAddAthlete = (userId: string, modality: Modality) =>
   });
 export const adminRemoveAthlete = (athleteId: string) =>
   adminApi<{ ok: boolean }>(`/api/v1/admin/athletes/${athleteId}`, { method: "DELETE" });
+export const adminHealAthlete = (athleteId: string) =>
+  adminApi<Athlete>(`/api/v1/admin/athletes/${athleteId}/heal`, { method: "POST" });
 
 // aprovação de entrada de contas
 export const adminApproveUser = (userId: string, approved: boolean) =>
@@ -183,6 +185,18 @@ export function useAdminPatchAthlete(userId?: string) {
   return useMutation({
     mutationFn: (v: { athleteId: string; body: Record<string, unknown> }) =>
       adminPatchAthlete(v.athleteId, v.body),
+    onSuccess: (athlete) => {
+      qc.setQueryData<Athlete[]>(["admin", "athletes", userId], (old) =>
+        old?.map((a) => (a.id === athlete.id ? athlete : a)),
+      );
+    },
+  });
+}
+
+export function useAdminHealAthlete(userId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (athleteId: string) => adminHealAthlete(athleteId),
     onSuccess: (athlete) => {
       qc.setQueryData<Athlete[]>(["admin", "athletes", userId], (old) =>
         old?.map((a) => (a.id === athlete.id ? athlete : a)),

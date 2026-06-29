@@ -77,11 +77,16 @@ class AdminService:
         return await AthleteRepository(self.session).list_by_club(club.id)
 
     async def patch_athlete(self, athlete_id: uuid.UUID, data: dict) -> Athlete:
+        from datetime import date as _date
+
         repo = AthleteRepository(self.session)
         athlete = await repo.get(athlete_id)
         if athlete is None:
             raise NotFound("Atleta não encontrado.")
         attrs = data.pop("attributes", None)
+        age = data.pop("age", None)
+        if age is not None:
+            athlete.birth_date = _date(_date.today().year - int(age), 1, 1)
         for key, value in data.items():
             if value is not None:
                 setattr(athlete, key, value)
@@ -89,6 +94,19 @@ class AdminService:
             for key, value in attrs.items():
                 if value is not None:
                     setattr(athlete.attributes, key, value)
+        return athlete
+
+    async def heal_athlete(self, athlete_id: uuid.UUID) -> Athlete:
+        """Remove fadiga/lesão de um atleta (volta a ficar disponível)."""
+        athlete = await AthleteRepository(self.session).get(athlete_id)
+        if athlete is None:
+            raise NotFound("Atleta não encontrado.")
+        athlete.condition = "ok"
+        athlete.is_injured = False
+        athlete.injured_until = None
+        athlete.rest_games_left = 0
+        athlete.games_since_rest = 0
+        athlete.hard_streak = 0
         return athlete
 
     async def add_athlete(self, user_id: uuid.UUID, modality: Modality) -> Athlete:

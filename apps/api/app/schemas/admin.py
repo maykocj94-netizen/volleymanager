@@ -60,8 +60,12 @@ class AttributesPatch(BaseModel):
 
 
 class AthletePatch(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
+    first_name: str | None = Field(default=None, max_length=40)
+    last_name: str | None = Field(default=None, max_length=40)
+    age: int | None = Field(default=None, ge=15, le=60)
+    height_cm: int | None = Field(default=None, ge=140, le=230)
+    weight_kg: int | None = Field(default=None, ge=40, le=160)
+    level: int | None = Field(default=None, ge=1, le=999)
     current_ability: int | None = Field(default=None, ge=0, le=100)
     potential_ability: int | None = Field(default=None, ge=0, le=100)
     morale: int | None = Field(default=None, ge=0, le=100)

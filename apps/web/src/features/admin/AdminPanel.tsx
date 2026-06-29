@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield,
-  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag, UserCog, Clock, Ticket,
+  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag, UserCog, Clock, Ticket, HeartPulse,
 } from "lucide-react";
 import {
   ATTRIBUTE_LABEL,
@@ -33,6 +33,7 @@ import {
   useAdminCreateProduct,
   useAdminDeleteListing,
   useAdminDeleteProduct,
+  useAdminHealAthlete,
   useAdminListings,
   useAdminPatchAthlete,
   useAdminProducts,
@@ -833,17 +834,40 @@ function CoinControl({
   );
 }
 
+function ageFromBirth(birth: string): number {
+  return Math.max(15, Math.floor((Date.now() - new Date(birth).getTime()) / (365.25 * 24 * 3600 * 1000)));
+}
+
 function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string }) {
   const patch = useAdminPatchAthlete(userId);
   const remove = useAdminRemoveAthlete(userId);
+  const heal = useAdminHealAthlete(userId);
   const [open, setOpen] = useState(false);
+  const [firstName, setFirstName] = useState(athlete.first_name);
+  const [lastName, setLastName] = useState(athlete.last_name);
+  const [age, setAge] = useState(() => ageFromBirth(athlete.birth_date));
+  const [height, setHeight] = useState(athlete.height_cm);
+  const [level, setLevel] = useState(athlete.level);
   const [ca, setCa] = useState(athlete.current_ability);
   const [pa, setPa] = useState(athlete.potential_ability);
   const [attrs, setAttrs] = useState<AthleteAttributes>(athlete.attributes ?? ({} as AthleteAttributes));
   const pos = athlete.beach_position ?? athlete.court_position ?? "";
+  const ailing = athlete.condition !== "ok";
 
   function save() {
-    patch.mutate({ athleteId: athlete.id, body: { current_ability: ca, potential_ability: pa, attributes: attrs } });
+    patch.mutate({
+      athleteId: athlete.id,
+      body: {
+        first_name: firstName.trim() || athlete.first_name,
+        last_name: lastName.trim() || athlete.last_name,
+        age,
+        height_cm: height,
+        level,
+        current_ability: ca,
+        potential_ability: pa,
+        attributes: attrs,
+      },
+    });
     setOpen(false);
   }
 
@@ -865,6 +889,17 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
           </p>
           <p className="text-xs text-ink-muted">CA {athlete.current_ability} · PA {athlete.potential_ability} · LVL {athlete.level}</p>
         </div>
+        {ailing && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => heal.mutate(athlete.id)}
+            disabled={heal.isPending}
+            title="Remover fadiga/lesão"
+          >
+            {heal.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <HeartPulse className="h-4 w-4 text-emerald-400" />} Curar
+          </Button>
+        )}
         <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}><Pencil className="h-4 w-4" /> Editar</Button>
         <Button size="sm" variant="ghost" onClick={() => remove.mutate(athlete.id)} disabled={remove.isPending}>
           <Trash2 className="h-4 w-4 text-red-400" />
@@ -873,7 +908,12 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
 
       {open && (
         <div className="border-t border-graphite-border p-3">
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            <TextField label="Nome" value={firstName} onChange={setFirstName} />
+            <TextField label="Sobrenome" value={lastName} onChange={setLastName} />
+            <NumField label="Idade" value={age} onChange={setAge} min={15} max={60} />
+            <NumField label="Altura (cm)" value={height} onChange={setHeight} min={140} max={230} />
+            <NumField label="Nível (LVL)" value={level} onChange={setLevel} min={1} max={999} />
             <NumField label="Habilidade (CA)" value={ca} onChange={setCa} />
             <NumField label="Potencial (PA)" value={pa} onChange={setPa} />
           </div>
@@ -883,10 +923,15 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
                 onChange={(v) => setAttrs((s) => ({ ...s, [k]: v }))} />
             ))}
           </div>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" onClick={save} disabled={patch.isPending}>
               {patch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
             </Button>
+            {ailing && (
+              <Button size="sm" variant="outline" onClick={() => heal.mutate(athlete.id)} disabled={heal.isPending}>
+                <HeartPulse className="h-4 w-4 text-emerald-400" /> Remover fadiga/lesão
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -903,12 +948,26 @@ function StatBox({ label, value, tone }: { label: string; value: number | string
   );
 }
 
-function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function NumField({
+  label, value, onChange, min = 0, max = 100,
+}: {
+  label: string; value: number; onChange: (v: number) => void; min?: number; max?: number;
+}) {
   return (
     <label className="flex flex-col gap-1 text-xs">
       <span className="truncate text-ink-faint">{label}</span>
-      <input type="number" min={0} max={100} value={value}
-        onChange={(e) => onChange(Math.max(0, Math.min(100, Number(e.target.value))))}
+      <input type="number" min={min} max={max} value={value}
+        onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
+        className="h-8 rounded border border-graphite-border bg-graphite px-2 text-sm text-ink" />
+    </label>
+  );
+}
+
+function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs">
+      <span className="truncate text-ink-faint">{label}</span>
+      <input value={value} onChange={(e) => onChange(e.target.value)}
         className="h-8 rounded border border-graphite-border bg-graphite px-2 text-sm text-ink" />
     </label>
   );

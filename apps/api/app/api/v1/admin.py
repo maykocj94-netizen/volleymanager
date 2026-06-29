@@ -76,6 +76,18 @@ async def patch_athlete(
     return AthleteOut.model_validate(athlete)
 
 
+@router.post("/athletes/{athlete_id}/heal", response_model=AthleteOut)
+async def heal_athlete(
+    athlete_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> AthleteOut:
+    """Remove o status de fadigado/lesionado do atleta."""
+    try:
+        athlete = await AdminService(session).heal_athlete(athlete_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return AthleteOut.model_validate(athlete)
+
+
 @router.post("/users/{user_id}/athletes", response_model=AthleteOut, status_code=201)
 async def add_athlete(
     user_id: uuid.UUID, body: AdminAddAthlete, session: DbSession, _admin: AdminAuth

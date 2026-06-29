@@ -56,6 +56,9 @@ class Athlete(Base):
     # Lesão: até quando (tempo real) e sequência de jogos difíceis seguidos.
     injured_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     hard_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Última partida Single (tempo real): usada para o intervalo anti-spam —
+    # partidas espaçadas (>= 1 min) não acumulam risco de fadiga/lesão.
+    last_played_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Treino: último dia (real) em que treinou — limita a 1 treino por dia.
     last_trained_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Venda: atleta anunciado pelo jogador, aguardando aprovação do dono.
