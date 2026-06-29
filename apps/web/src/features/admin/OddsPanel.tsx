@@ -25,7 +25,7 @@ export function OddsPanel() {
     <div className="space-y-5">
       <CreateForm />
       <div>
-        <p className="mb-2 text-xs uppercase tracking-wide text-ink-faint">Apostas ({odds?.length ?? 0})</p>
+        <p className="mb-2 text-xs uppercase tracking-wide text-ink-faint">BET ({odds?.length ?? 0})</p>
         {isLoading ? (
           <Spinner />
         ) : !odds?.length ? (
@@ -208,7 +208,7 @@ function OddRow({ odd: o }: { odd: Odd }) {
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
-            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />} Apostas
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />} BET
           </Button>
           {o.status !== "settled" && (
             <Button size="sm" variant="ghost" onClick={() => del.mutate(o.id)} disabled={del.isPending}>

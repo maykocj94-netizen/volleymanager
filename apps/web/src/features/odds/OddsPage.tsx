@@ -31,7 +31,7 @@ export function OddsPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <Ticket className="h-6 w-6 text-brand" /> Apostas
+            <Ticket className="h-6 w-6 text-brand" /> BET
           </h1>
           <p className="text-sm text-ink-muted">
             Aposte num confronto e ganhe pelo multiplicador (odd) se acertar. O pagamento
@@ -39,7 +39,7 @@ export function OddsPage() {
           </p>
         </div>
         <Button variant="subtle" onClick={() => setShowHistory((v) => !v)}>
-          <History className="h-4 w-4" /> Histórico de apostas
+          <History className="h-4 w-4" /> Histórico de BET
           {!!myBets?.length && (
             <span className="ml-1 rounded-full bg-brand/20 px-1.5 text-[10px] font-bold text-brand">{myBets.length}</span>
           )}
@@ -200,7 +200,7 @@ function History_({ bets }: { bets: OddBet[] }) {
   return (
     <Card>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="font-semibold">Histórico de apostas</p>
+        <p className="font-semibold">Histórico de BET</p>
         <p className="text-xs text-ink-muted">
           {bets.length} no total · {open} em aberto · {won.length} ganha(s)
           {wonTotal > 0 && <> · +{wonTotal.toLocaleString("pt-BR")} recebido</>}

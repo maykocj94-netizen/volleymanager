@@ -344,7 +344,7 @@ function SalesPanel() {
       {sales.map((s) => (
         <Card key={s.id} className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-semibold">{s.athlete_name} <span className="text-xs text-ink-faint">· CA {s.current_ability}</span></p>
+            <p className="font-semibold">{s.athlete_name} <span className="text-xs text-ink-faint">· HAB {s.current_ability}</span></p>
             <p className="text-xs text-ink-muted">Preço pedido: 🥈 {s.price.toLocaleString("pt-BR")} · vendedor {s.seller_id.slice(0, 8)}…</p>
           </div>
           <div className="flex gap-2">
@@ -401,7 +401,7 @@ function ListingsPanel({ onViewAccount }: { onViewAccount: (userId: string) => v
                       <StatusBadge status={li.status} />
                     </p>
                     <p className="text-xs text-ink-muted">
-                      {disc} · {SEX_LABEL[li.sex]} · {li.age}a · CA {li.current_ability} · 🥈 {li.price.toLocaleString("pt-BR")}
+                      {disc} · {SEX_LABEL[li.sex]} · {li.age}a · HAB {li.current_ability} · 🥈 {li.price.toLocaleString("pt-BR")}
                       {li.price_gold > 0 && ` · 🥇 ${li.price_gold.toLocaleString("pt-BR")}`} · validade {li.availability_days}d
                     </p>
 
@@ -887,7 +887,7 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
               </span>
             )}
           </p>
-          <p className="text-xs text-ink-muted">CA {athlete.current_ability} · PA {athlete.potential_ability} · LVL {athlete.level}</p>
+          <p className="text-xs text-ink-muted">HAB {athlete.current_ability} · POT {athlete.potential_ability} · LVL {athlete.level}</p>
         </div>
         {ailing && (
           <Button
@@ -914,8 +914,8 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
             <NumField label="Idade" value={age} onChange={setAge} min={15} max={60} />
             <NumField label="Altura (cm)" value={height} onChange={setHeight} min={140} max={230} />
             <NumField label="Nível (LVL)" value={level} onChange={setLevel} min={1} max={999} />
-            <NumField label="Habilidade (CA)" value={ca} onChange={setCa} />
-            <NumField label="Potencial (PA)" value={pa} onChange={setPa} />
+            <NumField label="Habilidade (HAB)" value={ca} onChange={setCa} />
+            <NumField label="Potencial (POT)" value={pa} onChange={setPa} />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {ATTR_KEYS.map((k) => (

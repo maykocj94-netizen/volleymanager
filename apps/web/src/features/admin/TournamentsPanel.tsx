@@ -299,7 +299,7 @@ function EntryRow({
                   title="Ver card de estatísticas e habilidades"
                 >
                   <span className="truncate">{a.first_name} {a.last_name}</span>
-                  <span className="ml-2 shrink-0 text-xs text-ink-muted">CA {a.current_ability} · LVL {a.level} · ⓘ</span>
+                  <span className="ml-2 shrink-0 text-xs text-ink-muted">HAB {a.current_ability} · LVL {a.level} · ⓘ</span>
                 </button>
               ))}
             </div>

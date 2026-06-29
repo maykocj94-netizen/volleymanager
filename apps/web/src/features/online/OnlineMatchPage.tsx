@@ -387,7 +387,7 @@ function TeamList({ athletes, onClick }: { athletes: Athlete[]; onClick: (a: Ath
         <button key={a.id} onClick={() => onClick(a)}
           className="flex w-full items-center justify-between rounded bg-graphite px-3 py-2 text-left text-sm hover:bg-graphite-light">
           <span>{a.first_name} {a.last_name}</span>
-          <span className="text-xs text-ink-muted">CA {a.current_ability} · LVL {a.level} · ⓘ</span>
+          <span className="text-xs text-ink-muted">HAB {a.current_ability} · LVL {a.level} · ⓘ</span>
         </button>
       ))}
     </div>
@@ -424,7 +424,7 @@ function LineupPicker({ challengeId, kind, sex, teamSize, current }: {
                   className={cn("flex w-full items-center justify-between rounded border px-3 py-1.5 text-left text-sm",
                     on ? "border-brand bg-brand/10" : "border-graphite-border bg-graphite")}>
                   <span>{a.first_name} {a.last_name}</span>
-                  <span className="text-xs text-ink-muted">CA {a.current_ability}</span>
+                  <span className="text-xs text-ink-muted">HAB {a.current_ability}</span>
                 </button>
               );
             })}

@@ -255,7 +255,7 @@ function RegisterForm({ detail }: { detail: TournamentDetail }) {
                   )}
                 >
                   <span>{a.first_name} {a.last_name}</span>
-                  <span className="text-xs text-ink-muted">CA {a.current_ability} · LVL {a.level}</span>
+                  <span className="text-xs text-ink-muted">HAB {a.current_ability} · LVL {a.level}</span>
                 </button>
               );
             })}
