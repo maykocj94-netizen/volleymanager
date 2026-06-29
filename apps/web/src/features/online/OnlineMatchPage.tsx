@@ -27,9 +27,19 @@ import { AthleteDetail } from "@/features/squad/AthleteCard";
 export function OnlineMatchPage() {
   const hb = useHeartbeat();
   const activeId = hb.data?.active_id ?? null;
-  // Permite sair da sala/resultado sem esperar o servidor expirar o desafio.
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  const showLobby = activeId && activeId !== dismissed;
+  const activeStatus = hb.data?.active_status ?? null;
+  // A sala só abre automaticamente em desafios EM ANDAMENTO (aceito/rodando).
+  // Um desafio já FINALIZADO não reabre sozinho (evita ficar preso no resultado
+  // ao recarregar). Você continua vendo o resultado logo após a partida, e
+  // "Voltar ao lobby" libera a lista de desafios.
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (activeId && activeStatus && activeStatus !== "finished") {
+      setViewingId(activeId);
+    }
+  }, [activeId, activeStatus]);
+
+  const showLobby = !!activeId && viewingId === activeId;
   return (
     <div className="space-y-6">
       <header>
@@ -37,7 +47,7 @@ export function OnlineMatchPage() {
         <p className="text-sm text-ink-muted">Desafie outros treinadores e aposte moedas. O vencedor leva tudo.</p>
       </header>
       {showLobby ? (
-        <LobbyView key={activeId} id={activeId} onLeave={() => setDismissed(activeId)} />
+        <LobbyView key={activeId} id={activeId} onLeave={() => setViewingId(null)} />
       ) : (
         <OnlineList hb={hb.data} />
       )}
