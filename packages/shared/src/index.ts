@@ -6,3 +6,4 @@ export * from "./tournament";
 export * from "./online";
 export * from "./store";
 export * from "./odd";
+export * from "./lootbox";

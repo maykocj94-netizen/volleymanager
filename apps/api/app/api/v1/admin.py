@@ -21,6 +21,15 @@ from app.schemas.market import (
     HireListingUpdate,
     SaleRequestOut,
 )
+from app.schemas.lootbox import (
+    AddItemRequest,
+    LootboxCreate,
+    LootboxDetailOut,
+    LootboxItemOut,
+    LootboxOut,
+    LootboxUpdate,
+    UpdateItemRequest,
+)
 from app.schemas.odd import (
     OddAdminDetailOut,
     OddBetAdminOut,
@@ -41,6 +50,7 @@ from app.schemas.tournament import (
 from app.services.admin_service import AdminService
 from app.services.market_service import expire_due
 from app.services.sales_service import SalesService
+from app.services.lootbox_service import LootboxAdminService, LootboxError
 from app.services.odd_service import OddAdminService, OddError
 from app.services.store_service import StoreAdminService, StoreError
 from app.services.tournament_service import NotFound as TournamentNotFound
@@ -458,6 +468,92 @@ async def admin_delete_odd(
 ) -> dict[str, bool]:
     try:
         await OddAdminService(session).delete(odd_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+# --- Lootbox (caixas — só admin) ------------------------------------------
+@router.get("/lootboxes", response_model=list[LootboxOut])
+async def admin_list_lootboxes(session: DbSession, _admin: AdminAuth) -> list[LootboxOut]:
+    rows = await LootboxAdminService(session).list_boxes()
+    return [LootboxOut(**r) for r in rows]
+
+
+@router.get("/lootboxes/{box_id}", response_model=LootboxDetailOut)
+async def admin_lootbox_detail(
+    box_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> LootboxDetailOut:
+    try:
+        data = await LootboxAdminService(session).get_detail(box_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return LootboxDetailOut(
+        box=LootboxOut(**data["box"]),
+        items=[LootboxItemOut(**i) for i in data["items"]],
+    )
+
+
+@router.post("/lootboxes", response_model=LootboxOut, status_code=201)
+async def admin_create_lootbox(
+    body: LootboxCreate, session: DbSession, _admin: AdminAuth
+) -> LootboxOut:
+    row = await LootboxAdminService(session).create_box(body.model_dump())
+    return LootboxOut(**row)
+
+
+@router.patch("/lootboxes/{box_id}", response_model=LootboxOut)
+async def admin_update_lootbox(
+    box_id: uuid.UUID, body: LootboxUpdate, session: DbSession, _admin: AdminAuth
+) -> LootboxOut:
+    try:
+        row = await LootboxAdminService(session).update_box(box_id, body.model_dump(exclude_unset=True))
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return LootboxOut(**row)
+
+
+@router.delete("/lootboxes/{box_id}")
+async def admin_delete_lootbox(
+    box_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> dict[str, bool]:
+    try:
+        await LootboxAdminService(session).delete_box(box_id)
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@router.post("/lootboxes/{box_id}/items", response_model=LootboxItemOut, status_code=201)
+async def admin_add_lootbox_item(
+    box_id: uuid.UUID, body: AddItemRequest, session: DbSession, _admin: AdminAuth
+) -> LootboxItemOut:
+    try:
+        row = await LootboxAdminService(session).add_item(box_id, body.model_dump(mode="json"))
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LootboxError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return LootboxItemOut(**row)
+
+
+@router.patch("/lootboxes/items/{item_id}", response_model=LootboxItemOut)
+async def admin_update_lootbox_item(
+    item_id: uuid.UUID, body: UpdateItemRequest, session: DbSession, _admin: AdminAuth
+) -> LootboxItemOut:
+    try:
+        row = await LootboxAdminService(session).update_item(item_id, body.model_dump())
+    except NotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return LootboxItemOut(**row)
+
+
+@router.delete("/lootboxes/items/{item_id}")
+async def admin_delete_lootbox_item(
+    item_id: uuid.UUID, session: DbSession, _admin: AdminAuth
+) -> dict[str, bool]:
+    try:
+        await LootboxAdminService(session).delete_item(item_id)
     except NotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"ok": True}

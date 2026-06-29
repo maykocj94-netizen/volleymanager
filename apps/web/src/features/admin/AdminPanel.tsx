@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Coins, LogOut, Loader2, Pencil, Plus, Save, Trash2, Shield,
-  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag, UserCog, Clock, Ticket, HeartPulse,
+  Check, X, Tag, UserPlus, RotateCw, Hourglass, Trophy, ShoppingBag, UserCog, Clock, Ticket, HeartPulse, Gift,
 } from "lucide-react";
 import {
   ATTRIBUTE_LABEL,
@@ -48,9 +48,10 @@ import {
 } from "@/lib/admin";
 import { TournamentsPanel } from "./TournamentsPanel";
 import { OddsPanel } from "./OddsPanel";
+import { LootboxPanel } from "./LootboxPanel";
 import { ConditionBadge } from "@/features/squad/AthleteCard";
 
-type Tab = "contas" | "vendas" | "anuncios" | "torneios" | "loja" | "odd";
+type Tab = "contas" | "vendas" | "anuncios" | "torneios" | "loja" | "odd" | "lootbox";
 
 /** K/D = razão entre vitórias e derrotas. */
 function kd(won: number, lost: number): string {
@@ -125,6 +126,9 @@ export function AdminPanel() {
         <TabBtn active={tab === "odd"} onClick={() => setTab("odd")}>
           <Ticket className="h-4 w-4" /> Odd
         </TabBtn>
+        <TabBtn active={tab === "lootbox"} onClick={() => setTab("lootbox")}>
+          <Gift className="h-4 w-4" /> Lootbox
+        </TabBtn>
       </div>
 
       {tab === "contas" && <AccountsPanel focusUserId={focusUserId} />}
@@ -133,6 +137,7 @@ export function AdminPanel() {
       {tab === "torneios" && <TournamentsPanel />}
       {tab === "loja" && <ProductsPanel />}
       {tab === "odd" && <OddsPanel />}
+      {tab === "lootbox" && <LootboxPanel />}
     </div>
   );
 }

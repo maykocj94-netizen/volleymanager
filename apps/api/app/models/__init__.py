@@ -4,6 +4,7 @@ from app.models.athlete import Athlete, AthleteAttributes
 from app.models.challenge import Challenge
 from app.models.club import Club
 from app.models.hire_listing import HireListing
+from app.models.lootbox import Lootbox, LootboxItem
 from app.models.odd import Odd, OddBet
 from app.models.sale_request import SaleRequest
 from app.models.store import InventoryItem, StoreProduct, TrainingCenter
@@ -17,6 +18,8 @@ __all__ = [
     "Club",
     "HireListing",
     "InventoryItem",
+    "Lootbox",
+    "LootboxItem",
     "Odd",
     "OddBet",
     "SaleRequest",

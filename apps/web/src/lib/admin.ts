@@ -4,6 +4,8 @@ import type {
   AdminWallet,
   Athlete,
   HireListing,
+  Lootbox,
+  LootboxDetail,
   Modality,
   Odd,
   OddAdminDetail,
@@ -118,6 +120,23 @@ export const adminCancelOdd = (id: string) =>
   adminApi<Odd>(`/api/v1/admin/odds/${id}/cancel`, { method: "POST" });
 export const adminDeleteOdd = (id: string) =>
   adminApi<{ ok: boolean }>(`/api/v1/admin/odds/${id}`, { method: "DELETE" });
+
+// lootbox (caixas — só admin)
+export const adminListLootboxes = () => adminApi<Lootbox[]>("/api/v1/admin/lootboxes");
+export const adminLootboxDetail = (id: string) =>
+  adminApi<LootboxDetail>(`/api/v1/admin/lootboxes/${id}`);
+export const adminCreateLootbox = (body: Record<string, unknown>) =>
+  adminApi<Lootbox>("/api/v1/admin/lootboxes", { method: "POST", body: JSON.stringify(body) });
+export const adminUpdateLootbox = (id: string, body: Record<string, unknown>) =>
+  adminApi<Lootbox>(`/api/v1/admin/lootboxes/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const adminDeleteLootbox = (id: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/lootboxes/${id}`, { method: "DELETE" });
+export const adminAddLootboxItem = (boxId: string, body: Record<string, unknown>) =>
+  adminApi<unknown>(`/api/v1/admin/lootboxes/${boxId}/items`, { method: "POST", body: JSON.stringify(body) });
+export const adminUpdateLootboxItem = (itemId: string, probability: number) =>
+  adminApi<unknown>(`/api/v1/admin/lootboxes/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ probability }) });
+export const adminDeleteLootboxItem = (itemId: string) =>
+  adminApi<{ ok: boolean }>(`/api/v1/admin/lootboxes/items/${itemId}`, { method: "DELETE" });
 
 // torneios
 export const adminListTournaments = () => adminApi<Tournament[]>("/api/v1/admin/tournaments");
@@ -501,6 +520,78 @@ export function useAdminDeleteOdd() {
     onSuccess: (_res, id) => {
       qc.setQueryData<Odd[]>(["admin", "odds"], (old) => old?.filter((x) => x.id !== id));
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
+// --- lootbox (caixas) ---
+export function useAdminLootboxes() {
+  return useQuery({ queryKey: ["admin", "lootboxes"], queryFn: adminListLootboxes });
+}
+
+export function useAdminLootboxDetail(id: string | null) {
+  return useQuery({
+    queryKey: ["admin", "lootbox", id],
+    queryFn: () => adminLootboxDetail(id!),
+    enabled: !!id,
+  });
+}
+
+export function useAdminCreateLootbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => adminCreateLootbox(body),
+    onSuccess: (b) => qc.setQueryData<Lootbox[]>(["admin", "lootboxes"], (old) => [b, ...(old ?? [])]),
+  });
+}
+
+export function useAdminUpdateLootbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; body: Record<string, unknown> }) => adminUpdateLootbox(v.id, v.body),
+    onSuccess: (b) => {
+      qc.setQueryData<Lootbox[]>(["admin", "lootboxes"], (old) => old?.map((x) => (x.id === b.id ? b : x)));
+      qc.invalidateQueries({ queryKey: ["admin", "lootbox", b.id] });
+    },
+  });
+}
+
+export function useAdminDeleteLootbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminDeleteLootbox(id),
+    onSuccess: (_res, id) =>
+      qc.setQueryData<Lootbox[]>(["admin", "lootboxes"], (old) => old?.filter((x) => x.id !== id)),
+  });
+}
+
+export function useAdminAddLootboxItem(boxId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => adminAddLootboxItem(boxId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "lootbox", boxId] });
+      qc.invalidateQueries({ queryKey: ["admin", "lootboxes"] });
+    },
+  });
+}
+
+export function useAdminUpdateLootboxItem(boxId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { itemId: string; probability: number }) =>
+      adminUpdateLootboxItem(v.itemId, v.probability),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "lootbox", boxId] }),
+  });
+}
+
+export function useAdminDeleteLootboxItem(boxId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => adminDeleteLootboxItem(itemId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "lootbox", boxId] });
+      qc.invalidateQueries({ queryKey: ["admin", "lootboxes"] });
     },
   });
 }

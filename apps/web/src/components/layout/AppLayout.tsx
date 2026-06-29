@@ -10,6 +10,7 @@ import {
   Dumbbell,
   HeartPulse,
   Ticket,
+  Gift,
   CircleDot,
   LogOut,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const nav = [
   { to: "/partida", label: "Partida Single", short: "Single", icon: Swords },
   { to: "/partida-online", label: "Partida Online", short: "Online", icon: Globe },
   { to: "/competicoes", label: "Competições", short: "Torneios", icon: Trophy },
+  { to: "/lootbox", label: "Lootbox", short: "Lootbox", icon: Gift },
   { to: "/loja", label: "Loja", short: "Loja", icon: ShoppingBag },
   { to: "/ct", label: "Centro de Treino", short: "CT", icon: Dumbbell },
   { to: "/fisioterapia", label: "Fisioterapia", short: "Físio", icon: HeartPulse },
