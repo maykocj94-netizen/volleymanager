@@ -49,8 +49,10 @@ export interface Athlete {
   condition: AthleteCondition;
   rest_games_left: number;
   injured_until: string | null;
+  physio_until: string | null;
   last_trained_on: string | null;
   for_sale: boolean;
+  sale_listed_price: number | null;
   expires_at: string | null;
   listing_id: string | null;
   attributes: AthleteAttributes | null;

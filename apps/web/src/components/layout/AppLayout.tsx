@@ -8,6 +8,7 @@ import {
   Trophy,
   ShoppingBag,
   Dumbbell,
+  HeartPulse,
   Ticket,
   CircleDot,
   LogOut,
@@ -29,6 +30,7 @@ const nav = [
   { to: "/competicoes", label: "Competições", short: "Torneios", icon: Trophy },
   { to: "/loja", label: "Loja", short: "Loja", icon: ShoppingBag },
   { to: "/ct", label: "Centro de Treino", short: "CT", icon: Dumbbell },
+  { to: "/fisioterapia", label: "Fisioterapia", short: "Físio", icon: HeartPulse },
   { to: "/apostas", label: "BET", short: "BET", icon: Ticket },
 ];
 

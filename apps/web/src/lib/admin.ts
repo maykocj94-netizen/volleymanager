@@ -64,6 +64,13 @@ export const adminApproveUser = (userId: string, approved: boolean) =>
     body: JSON.stringify({ approved }),
   });
 
+// edição dos números do painel do usuário
+export const adminSetUserStats = (userId: string, body: Record<string, number>) =>
+  adminApi<AdminUser>(`/api/v1/admin/users/${userId}/stats`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 // vendas (aprovação do dono)
 export const adminListSales = () => adminApi<SaleRequest[]>("/api/v1/admin/sales");
 export const adminApproveSale = (id: string) =>
@@ -240,6 +247,19 @@ export function useAdminApproveUser() {
   return useMutation({
     mutationFn: (v: { userId: string; approved: boolean }) =>
       adminApproveUser(v.userId, v.approved),
+    onSuccess: (user) => {
+      qc.setQueryData<AdminUser[]>(["admin", "users"], (old) =>
+        old?.map((u) => (u.user_id === user.user_id ? user : u)),
+      );
+    },
+  });
+}
+
+export function useAdminSetUserStats() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { userId: string; body: Record<string, number> }) =>
+      adminSetUserStats(v.userId, v.body),
     onSuccess: (user) => {
       qc.setQueryData<AdminUser[]>(["admin", "users"], (old) =>
         old?.map((u) => (u.user_id === user.user_id ? user : u)),

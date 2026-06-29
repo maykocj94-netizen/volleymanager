@@ -62,8 +62,10 @@ class AthleteOut(BaseModel):
     condition: str = "ok"            # "ok" | "fatigued" | "injured"
     rest_games_left: int = 0
     injured_until: datetime | None = None
+    physio_until: datetime | None = None
     last_trained_on: date | None = None
     for_sale: bool = False
+    sale_listed_price: int | None = None  # preço (ouro) quando anunciado no mercado P2P
     expires_at: datetime | None = None
     listing_id: uuid.UUID | None = None  # veio de um anúncio (não vende, não treina)
     attributes: AttributesOut | None = None

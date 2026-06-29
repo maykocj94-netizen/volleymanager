@@ -6,6 +6,7 @@ import { SquadPage } from "@/features/squad/SquadPage";
 import { MarketPage } from "@/features/market/MarketPage";
 import { StorePage } from "@/features/store/StorePage";
 import { CtPage } from "@/features/ct/CtPage";
+import { FisioterapiaPage } from "@/features/physio/FisioterapiaPage";
 import { CompetitionsPage } from "@/features/competitions/CompetitionsPage";
 import { OddsPage } from "@/features/odds/OddsPage";
 import { OnlineMatchPage } from "@/features/online/OnlineMatchPage";
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       { path: "competicoes", element: <CompetitionsPage /> },
       { path: "loja", element: <StorePage /> },
       { path: "ct", element: <CtPage /> },
+      { path: "fisioterapia", element: <FisioterapiaPage /> },
       { path: "apostas", element: <OddsPage /> },
     ],
   },

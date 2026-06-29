@@ -59,6 +59,10 @@ class Athlete(Base):
     # Última partida Single (tempo real): usada para o intervalo anti-spam —
     # partidas espaçadas (>= 1 min) não acumulam risco de fadiga/lesão.
     last_played_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Fisioterapia: quando entrou e quando termina a recuperação (tempo real).
+    # Fadiga cura em 5 min; lesão em até 12h. Ao chegar em physio_until, fica "ok".
+    physio_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    physio_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Treino: último dia (real) em que treinou — limita a 1 treino por dia.
     last_trained_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Venda: atleta anunciado pelo jogador, aguardando aprovação do dono.

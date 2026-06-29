@@ -1,30 +1,46 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Athlete, HireListing, SaleRequest, UserState } from "@volley/shared";
+import type {
+  Athlete,
+  AthleteSaleResult,
+  HireListing,
+  MarketSale,
+  UserState,
+} from "@volley/shared";
 import { api } from "./api";
 
-// --- chamadas ---
+// --- contratações (anúncios do dono) ---
 export const getListings = () => api<HireListing[]>("/api/v1/market/listings");
 export const postHireListing = (listingId: string, currency: "silver" | "gold" = "silver") =>
   api<{ athlete: Athlete; state: UserState }>("/api/v1/market/hire", {
     method: "POST",
     body: JSON.stringify({ listing_id: listingId, currency }),
   });
+
+// --- mercado P2P (compra/venda direta entre jogadores, em ouro) ---
 export const postListForSale = (athleteId: string) =>
-  api<SaleRequest>("/api/v1/market/list-for-sale", {
+  api<Athlete>("/api/v1/market/list-for-sale", {
     method: "POST",
     body: JSON.stringify({ athlete_id: athleteId }),
   });
-export const getMySales = () => api<SaleRequest[]>("/api/v1/market/my-sales");
-export const postCancelSale = (requestId: string) =>
-  api<UserState>(`/api/v1/market/cancel-sale/${requestId}`, { method: "POST" });
+export const postUnlist = (athleteId: string) =>
+  api<Athlete>("/api/v1/market/unlist", {
+    method: "POST",
+    body: JSON.stringify({ athlete_id: athleteId }),
+  });
+export const getForSale = () => api<MarketSale[]>("/api/v1/market/for-sale");
+export const postBuyAthlete = (athleteId: string) =>
+  api<AthleteSaleResult>("/api/v1/market/buy-athlete", {
+    method: "POST",
+    body: JSON.stringify({ athlete_id: athleteId }),
+  });
 
 // --- hooks ---
 export function useListings() {
   return useQuery({ queryKey: ["market", "listings"], queryFn: getListings });
 }
 
-export function useMySales() {
-  return useQuery({ queryKey: ["market", "my-sales"], queryFn: getMySales });
+export function useForSale() {
+  return useQuery({ queryKey: ["market", "for-sale"], queryFn: getForSale });
 }
 
 export function useHireListing(clubId: string | undefined) {
@@ -45,19 +61,30 @@ export function useListForSale(clubId: string | undefined) {
   return useMutation({
     mutationFn: (athleteId: string) => postListForSale(athleteId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["market", "my-sales"] });
       qc.invalidateQueries({ queryKey: ["athletes", "club", clubId] });
+      qc.invalidateQueries({ queryKey: ["market", "for-sale"] });
     },
   });
 }
 
-export function useCancelSale(clubId: string | undefined) {
+export function useUnlist(clubId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (requestId: string) => postCancelSale(requestId),
-    onSuccess: (state) => {
-      qc.setQueryData(["me"], state);
-      qc.invalidateQueries({ queryKey: ["market", "my-sales"] });
+    mutationFn: (athleteId: string) => postUnlist(athleteId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["athletes", "club", clubId] });
+      qc.invalidateQueries({ queryKey: ["market", "for-sale"] });
+    },
+  });
+}
+
+export function useBuyAthlete(clubId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (athleteId: string) => postBuyAthlete(athleteId),
+    onSuccess: (res) => {
+      qc.setQueryData(["me"], res.state); // carteira (ouro)
+      qc.invalidateQueries({ queryKey: ["market", "for-sale"] });
       qc.invalidateQueries({ queryKey: ["athletes", "club", clubId] });
     },
   });

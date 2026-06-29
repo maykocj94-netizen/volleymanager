@@ -52,6 +52,19 @@ export interface HireListing {
   expires_at: string | null;
 }
 
+// --- Mercado P2P (compra direta entre jogadores, em ouro) ---
+export interface MarketSale {
+  athlete: Athlete;
+  seller_id: string;
+  seller_name: string;
+  price_gold: number;
+}
+
+export interface AthleteSaleResult {
+  state: UserState;
+  athlete: Athlete;
+}
+
 // --- Pedido de venda (aprovação do dono) ---
 export interface SaleRequest {
   id: string;

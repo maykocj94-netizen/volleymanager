@@ -70,6 +70,17 @@ class AdminService:
         state.approved = approved
         return state
 
+    async def set_user_stats(self, user_id: uuid.UUID, data: dict) -> UserState:
+        """Edita os números do painel do usuário (partidas/vitórias/derrotas)."""
+        state = await UserRepository(self.session).get_or_create_state(user_id)
+        for key in (
+            "matches_played", "matches_won", "matches_lost",
+            "online_wins", "online_losses",
+        ):
+            if data.get(key) is not None:
+                setattr(state, key, max(0, int(data[key])))
+        return state
+
     async def list_user_athletes(self, user_id: uuid.UUID) -> list[Athlete]:
         club = await self._club_of(user_id)
         if club is None:

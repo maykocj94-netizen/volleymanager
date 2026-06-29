@@ -12,6 +12,7 @@ from app.schemas.admin import (
     ApproveRequest,
     AthletePatch,
     CoinAdjust,
+    UserStatsPatch,
 )
 from app.schemas.athlete import AthleteOut
 from app.schemas.market import (
@@ -115,6 +116,19 @@ async def adjust_coins(
         user_id, body.silver_delta, body.gold_delta
     )
     return AdminWallet(user_id=user_id, silver=state.silver, gold=state.gold)
+
+
+# --- Estatísticas do painel do usuário (admin) ----------------------------
+@router.post("/users/{user_id}/stats", response_model=AdminUser)
+async def set_user_stats(
+    user_id: uuid.UUID, body: UserStatsPatch, session: DbSession, _admin: AdminAuth
+) -> AdminUser:
+    await AdminService(session).set_user_stats(user_id, body.model_dump(exclude_unset=True))
+    rows = await AdminService(session).list_users()
+    row = next((r for r in rows if str(r["user_id"]) == str(user_id)), None)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    return AdminUser(**row)
 
 
 # --- Aprovação de entrada de contas ---------------------------------------

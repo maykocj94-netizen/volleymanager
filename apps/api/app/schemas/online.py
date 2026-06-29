@@ -36,6 +36,7 @@ class HeartbeatOut(BaseModel):
     incoming: list[ChallengeBrief]
     outgoing: list[ChallengeBrief]
     active_id: uuid.UUID | None = None
+    active_status: str | None = None
 
 
 class ChallengeCreate(BaseModel):

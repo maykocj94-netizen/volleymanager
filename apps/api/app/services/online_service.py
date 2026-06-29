@@ -114,6 +114,7 @@ class OnlineService:
             "incoming": [self._chal_brief(c) for c in incoming],
             "outgoing": [self._chal_brief(c) for c in outgoing],
             "active_id": active.id if active else None,
+            "active_status": active.status if active else None,
         }
 
     def _chal_brief(self, c: Challenge) -> dict:

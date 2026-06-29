@@ -1,23 +1,31 @@
 import { useState } from "react";
-import { Loader2, Tag, UserPlus, Hourglass, X } from "lucide-react";
+import { Loader2, Tag, UserPlus, ShoppingCart, X, Info } from "lucide-react";
 import {
+  ATTRIBUTE_LABEL,
   POSITION_LABEL,
   SEX_LABEL,
+  type Athlete,
+  type AthleteAttributes,
   type HireListing,
+  type MarketSale,
 } from "@volley/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useClubAthletes, useMe, useMyClub } from "@/lib/game";
 import {
-  useCancelSale,
+  useBuyAthlete,
+  useForSale,
   useHireListing,
   useListForSale,
   useListings,
-  useMySales,
+  useUnlist,
 } from "@/lib/market";
-import { AthleteCard } from "@/features/squad/AthleteCard";
+import { AthleteCard, AthleteDetail } from "@/features/squad/AthleteCard";
 
-type Tab = "hire" | "sell";
+type Tab = "hire" | "buy" | "sell";
+
+/** Preço em ouro de um atleta (1 ouro = 10 prata). */
+const goldPrice = (silverValue: number) => Math.max(1, Math.round((silverValue || 0) / 10));
 
 export function MarketPage() {
   const [tab, setTab] = useState<Tab>("hire");
@@ -36,21 +44,26 @@ export function MarketPage() {
       <header>
         <h1 className="text-2xl font-bold">Mercado de Transferências</h1>
         <p className="text-sm text-ink-muted">
-          Contrate atletas publicados pelo administrador ou coloque seus atletas à venda
-          (a venda passa pela aprovação do dono).
+          Contrate atletas do administrador, compre atletas de outros usuários (em ouro) ou
+          coloque os seus à venda.
         </p>
       </header>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <TabButton active={tab === "hire"} onClick={() => setTab("hire")}>
           <UserPlus className="h-4 w-4" /> Contratações
+        </TabButton>
+        <TabButton active={tab === "buy"} onClick={() => setTab("buy")}>
+          <ShoppingCart className="h-4 w-4" /> Comprar
         </TabButton>
         <TabButton active={tab === "sell"} onClick={() => setTab("sell")}>
           <Tag className="h-4 w-4" /> Vender
         </TabButton>
       </div>
 
-      {tab === "hire" ? <HireTab clubId={club?.id} /> : <SellTab clubId={club?.id} />}
+      {tab === "hire" && <HireTab clubId={club?.id} />}
+      {tab === "buy" && <BuyTab clubId={club?.id} />}
+      {tab === "sell" && <SellTab clubId={club?.id} />}
     </div>
   );
 }
@@ -60,11 +73,13 @@ function HireTab({ clubId }: { clubId: string | undefined }) {
   const { data: listings, isLoading } = useListings();
   const { data: me } = useMe();
   const hire = useHireListing(clubId);
+  const [info, setInfo] = useState<HireListing | null>(null);
 
   if (isLoading) return <Spinner />;
 
   return (
     <div className="space-y-4">
+      {info && <ListingDetail listing={info} onClose={() => setInfo(null)} />}
       {hire.isSuccess && (
         <p className="text-sm text-emerald-400">
           Contratado: {hire.data.athlete.first_name} {hire.data.athlete.last_name}!
@@ -90,6 +105,7 @@ function HireTab({ clubId }: { clubId: string | undefined }) {
               <ListingCard
                 key={li.id}
                 listing={li}
+                onInfo={() => setInfo(li)}
                 footer={
                   <div className="flex flex-col gap-2">
                     <Button
@@ -124,7 +140,11 @@ function HireTab({ clubId }: { clubId: string | undefined }) {
   );
 }
 
-function ListingCard({ listing, footer }: { listing: HireListing; footer: React.ReactNode }) {
+function ListingCard({
+  listing, footer, onInfo,
+}: {
+  listing: HireListing; footer: React.ReactNode; onInfo: () => void;
+}) {
   const both = !!listing.beach_position && !!listing.court_position;
   const beach = !!listing.beach_position;
   const discipline = both ? "🏖️🏐 Ambos" : beach ? "🏖️ Praia" : "🏐 Quadra";
@@ -138,8 +158,15 @@ function ListingCard({ listing, footer }: { listing: HireListing; footer: React.
     <div className="card p-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-semibold leading-tight">
+          <p className="flex items-center gap-1.5 font-semibold leading-tight">
             {listing.first_name} {listing.last_name}
+            <button
+              onClick={onInfo}
+              className="text-ink-faint hover:text-brand"
+              title="Ver habilidades do atleta"
+            >
+              <Info className="h-4 w-4" />
+            </button>
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
             <span
@@ -171,72 +198,183 @@ function ListingCard({ listing, footer }: { listing: HireListing; footer: React.
   );
 }
 
-// --- Vender (com aprovação do dono) ---
+const ATTR_KEYS = Object.keys(ATTRIBUTE_LABEL) as (keyof AthleteAttributes)[];
+
+function rating(v: number) {
+  if (v >= 80) return "text-emerald-400";
+  if (v >= 65) return "text-brand";
+  if (v >= 50) return "text-ink";
+  return "text-ink-muted";
+}
+
+/** Modal com as habilidades de um anúncio de contratação. */
+function ListingDetail({ listing, onClose }: { listing: HireListing; onClose: () => void }) {
+  const attrs = listing.attributes ?? {};
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-graphite-border bg-surface p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div>
+            <p className="text-lg font-bold leading-tight">{listing.first_name} {listing.last_name}</p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {SEX_LABEL[listing.sex]} · {listing.age} anos · {listing.height_cm}cm · {listing.weight_kg}kg
+            </p>
+          </div>
+          <div className="text-right">
+            <p className={`text-3xl font-black tabular-nums ${rating(listing.current_ability)}`}>{listing.current_ability}</p>
+            <p className="text-[10px] uppercase text-ink-faint">pot {listing.potential_ability}</p>
+            <button onClick={onClose} className="mt-1 text-ink-faint hover:text-ink"><X className="ml-auto h-5 w-5" /></button>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+          {ATTR_KEYS.map((k) => (
+            <div key={k} className="rounded bg-graphite px-2 py-1.5 text-center">
+              <p className={`text-base font-bold tabular-nums ${rating((attrs as Record<string, number>)[k] ?? 0)}`}>
+                {(attrs as Record<string, number>)[k] ?? "—"}
+              </p>
+              <p className="text-[9px] uppercase leading-tight text-ink-faint">{ATTRIBUTE_LABEL[k]}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Comprar (mercado P2P: atletas à venda por outros usuários) ---
+function BuyTab({ clubId }: { clubId: string | undefined }) {
+  const { data: sales, isLoading } = useForSale();
+  const { data: me } = useMe();
+  const buy = useBuyAthlete(clubId);
+  const [detail, setDetail] = useState<Athlete | null>(null);
+
+  if (isLoading) return <Spinner />;
+
+  return (
+    <div className="space-y-4">
+      {detail && <AthleteDetail athlete={detail} onClose={() => setDetail(null)} />}
+      <p className="text-sm text-ink-muted">
+        🛒 Atletas colocados à venda por outros treinadores. A compra é paga em{" "}
+        <b className="text-amber-300">ouro</b> e vai direto para o vendedor.
+      </p>
+      {buy.isError && (
+        <p className="text-sm text-red-400">
+          {String(buy.error).includes("402")
+            ? "Ouro insuficiente para comprar."
+            : "Atleta não está mais disponível."}
+        </p>
+      )}
+      {!sales?.length ? (
+        <Card className="text-ink-muted">Nenhum atleta à venda no momento.</Card>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {sales.map((s) => (
+            <BuyCard
+              key={s.athlete.id}
+              sale={s}
+              canBuy={!!me && me.gold >= s.price_gold}
+              busy={buy.isPending}
+              onInfo={() => setDetail(s.athlete)}
+              onBuy={() => buy.mutate(s.athlete.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BuyCard({
+  sale, canBuy, busy, onInfo, onBuy,
+}: {
+  sale: MarketSale; canBuy: boolean; busy: boolean; onInfo: () => void; onBuy: () => void;
+}) {
+  const a = sale.athlete;
+  const pos = a.beach_position ?? a.court_position ?? "";
+  return (
+    <div className="card p-4">
+      <div className="flex items-start justify-between">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 font-semibold leading-tight">
+            <button onClick={onInfo} className="truncate hover:text-brand hover:underline" title="Ver estatísticas">
+              {a.first_name} {a.last_name}
+            </button>
+            <button onClick={onInfo} className="text-ink-faint hover:text-brand"><Info className="h-4 w-4" /></button>
+          </p>
+          <p className="mt-1 text-xs text-ink-muted">
+            {POSITION_LABEL[pos] ?? pos} · {SEX_LABEL[a.sex]} · LVL {a.level}
+          </p>
+          <p className="mt-0.5 text-[11px] text-ink-faint">Vendedor: {sale.seller_name}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-black tabular-nums text-brand">{a.current_ability}</p>
+          <p className="text-[10px] uppercase text-ink-faint">pot {a.potential_ability}</p>
+        </div>
+      </div>
+      <div className="mt-3 border-t border-graphite-border pt-3">
+        <Button
+          size="sm"
+          className="w-full"
+          onClick={onBuy}
+          disabled={busy || !canBuy}
+          title={canBuy ? "" : "Ouro insuficiente"}
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+          Comprar por 🥇 {sale.price_gold.toLocaleString("pt-BR")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// --- Vender (mercado P2P em ouro) ---
 function SellTab({ clubId }: { clubId: string | undefined }) {
   const { data: athletes, isLoading } = useClubAthletes(clubId);
-  const { data: sales } = useMySales();
   const list = useListForSale(clubId);
-  const cancel = useCancelSale(clubId);
+  const unlist = useUnlist(clubId);
 
   if (isLoading) return <Spinner />;
   if (!athletes?.length) return <Card className="text-ink-muted">Elenco vazio.</Card>;
 
-  const pendingByAthlete = new Map((sales ?? []).map((s) => [s.athlete_id, s]));
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-ink-muted">
-        💡 Ao colocar à venda, o pedido vai para o <b className="text-brand">painel do dono</b>,
-        que confirma ou recusa. A prata só é creditada após a aprovação.
+        💡 Ao colocar à venda, seu atleta fica visível na aba <b className="text-brand">Comprar</b> dos
+        outros usuários. Quando alguém comprar, você recebe o valor em <b className="text-amber-300">ouro</b>.
       </p>
-      {list.isSuccess && (
-        <p className="text-sm text-emerald-400">
-          Atleta anunciado! Aguardando aprovação do dono.
-        </p>
-      )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {athletes.map((a) => {
-          const pending = pendingByAthlete.get(a.id) ?? (a.for_sale ? { id: "" } : null);
-          return (
-            <AthleteCard
-              key={a.id}
-              athlete={a}
-              footer={
-                a.listing_id ? (
-                  <span className="flex items-center gap-1 text-xs text-ink-faint">
-                    🔒 Contratação — não pode ser vendida
+        {athletes.map((a) => (
+          <AthleteCard
+            key={a.id}
+            athlete={a}
+            footer={
+              a.listing_id ? (
+                <span className="flex items-center gap-1 text-xs text-ink-faint">
+                  🔒 Contratação — não pode ser vendida
+                </span>
+              ) : a.for_sale ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-amber-300">
+                    🏷️ À venda por 🥇 {(a.sale_listed_price ?? goldPrice(a.sale_value)).toLocaleString("pt-BR")}
                   </span>
-                ) : pending ? (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1 text-xs text-amber-400">
-                      <Hourglass className="h-3.5 w-3.5" /> Aguardando aprovação
-                    </span>
-                    {pending.id && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => cancel.mutate(pending.id)}
-                        disabled={cancel.isPending}
-                      >
-                        <X className="h-4 w-4" /> Cancelar
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="subtle"
-                    className="w-full"
-                    onClick={() => list.mutate(a.id)}
-                    disabled={list.isPending}
-                  >
-                    <Tag className="h-4 w-4" /> Colocar à venda ({a.sale_value.toLocaleString("pt-BR")})
+                  <Button size="sm" variant="ghost" onClick={() => unlist.mutate(a.id)} disabled={unlist.isPending}>
+                    <X className="h-4 w-4" /> Tirar
                   </Button>
-                )
-              }
-            />
-          );
-        })}
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  className="w-full"
+                  onClick={() => list.mutate(a.id)}
+                  disabled={list.isPending}
+                >
+                  <Tag className="h-4 w-4" /> Vender por 🥇 {goldPrice(a.sale_value).toLocaleString("pt-BR")}
+                </Button>
+              )
+            }
+          />
+        ))}
       </div>
     </div>
   );

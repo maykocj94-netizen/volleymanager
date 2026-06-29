@@ -38,6 +38,7 @@ async def heartbeat(session: DbSession, user: CurrentUser) -> HeartbeatOut:
         incoming=[ChallengeBrief(**c) for c in data["incoming"]],
         outgoing=[ChallengeBrief(**c) for c in data["outgoing"]],
         active_id=data["active_id"],
+        active_status=data["active_status"],
     )
 
 

@@ -30,6 +30,16 @@ class ApproveRequest(BaseModel):
     approved: bool = True
 
 
+class UserStatsPatch(BaseModel):
+    """Edição dos números do painel do usuário (admin)."""
+
+    matches_played: int | None = Field(default=None, ge=0, le=1_000_000)
+    matches_won: int | None = Field(default=None, ge=0, le=1_000_000)
+    matches_lost: int | None = Field(default=None, ge=0, le=1_000_000)
+    online_wins: int | None = Field(default=None, ge=0, le=1_000_000)
+    online_losses: int | None = Field(default=None, ge=0, le=1_000_000)
+
+
 class CoinAdjust(BaseModel):
     """Deltas de moedas (podem ser negativos para remover)."""
 

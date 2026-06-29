@@ -30,8 +30,10 @@ _LAST = [
 # Níveis de dificuldade → faixa de força da CPU (0–100).
 TIER_ORDER = ["facil", "medio", "dificil", "muito_dificil", "brutal"]
 TIER_BASE: dict[str, tuple[int, int]] = {
-    "facil": (45, 56),
-    "medio": (60, 71),
+    # Fácil/Médio rebaixados para o jogador vencer com mais facilidade mesmo com
+    # elencos medianos. Difícil/Muito difícil/Brutal mantidos (desafio real).
+    "facil": (34, 44),
+    "medio": (48, 58),
     "dificil": (78, 85),
     "muito_dificil": (88, 92),
     "brutal": (95, 99),

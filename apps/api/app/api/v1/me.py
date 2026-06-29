@@ -95,7 +95,11 @@ async def get_me(session: DbSession, user: CurrentUser) -> UserStateOut:
     # Captura o e-mail de login (do JWT) para exibir na central de contas.
     if user.email and state.email != user.email:
         state.email = user.email
-    return _to_out(state, await _club(session, uid))
+    # Conclui fisioterapias que já terminaram (cura preguiçosa).
+    from app.services.physio_service import sync_physio
+    club = await _club(session, uid)
+    await sync_physio(session, club_id=club.id if club else None)
+    return _to_out(state, club)
 
 
 @router.post("/login", response_model=LoginResult)

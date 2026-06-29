@@ -90,6 +90,24 @@ class ListForSaleRequest(BaseModel):
     athlete_id: uuid.UUID
 
 
+class BuyAthleteRequest(BaseModel):
+    athlete_id: uuid.UUID
+
+
+class MarketSaleOut(BaseModel):
+    """Atleta à venda no mercado P2P (visível para os demais usuários)."""
+
+    athlete: AthleteOut
+    seller_id: uuid.UUID
+    seller_name: str
+    price_gold: int
+
+
+class AthleteSaleResult(BaseModel):
+    state: UserStateOut
+    athlete: AthleteOut
+
+
 class SaleRequestOut(BaseModel):
     id: uuid.UUID
     athlete_id: uuid.UUID

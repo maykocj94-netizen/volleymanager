@@ -41,6 +41,7 @@ import {
   useAdminRepublishListing,
   useAdminResolveSale,
   useAdminSales,
+  useAdminSetUserStats,
   useAdminUpdateListing,
   useAdminUpdateProduct,
   useAdminUsers,
@@ -256,21 +257,8 @@ function UserDetail({ user }: { user: AdminUser }) {
         </div>
       </Card>
 
-      {/* Desempenho do painel do usuário */}
-      <Card>
-        <p className="mb-3 font-semibold">Desempenho</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <StatBox label="Partidas" value={user.matches_played} />
-          <StatBox label="Vitórias" value={user.matches_won} tone="text-emerald-400" />
-          <StatBox label="Derrotas" value={user.matches_lost} tone="text-red-400" />
-          <StatBox label="K/D" value={kd(user.matches_won, user.matches_lost)} tone="text-brand" />
-          <StatBox label="Online V" value={user.online_wins} tone="text-emerald-400" />
-          <StatBox label="Online D" value={user.online_losses} tone="text-red-400" />
-        </div>
-        <p className="mt-3 text-xs text-ink-faint">
-          🔥 Sequência de login: {user.streak} dia(s) · 👥 {user.athlete_count} atleta(s)
-        </p>
-      </Card>
+      {/* Desempenho do painel do usuário (editável) */}
+      <StatsEditor user={user} />
 
       {/* Moedas */}
       <Card>
@@ -936,6 +924,62 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
         </div>
       )}
     </div>
+  );
+}
+
+function StatsEditor({ user }: { user: AdminUser }) {
+  const save = useAdminSetUserStats();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({
+    matches_played: user.matches_played,
+    matches_won: user.matches_won,
+    matches_lost: user.matches_lost,
+    online_wins: user.online_wins,
+    online_losses: user.online_losses,
+  });
+  const set = (k: string, v: number) => setF((s) => ({ ...s, [k]: Math.max(0, v) }));
+
+  return (
+    <Card>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold">Desempenho</p>
+        <Button size="sm" variant={open ? "outline" : "subtle"} onClick={() => setOpen((v) => !v)}>
+          <Pencil className="h-4 w-4" /> {open ? "Fechar" : "Editar números"}
+        </Button>
+      </div>
+
+      {!open ? (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <StatBox label="Partidas" value={user.matches_played} />
+            <StatBox label="Vitórias" value={user.matches_won} tone="text-emerald-400" />
+            <StatBox label="Derrotas" value={user.matches_lost} tone="text-red-400" />
+            <StatBox label="K/D" value={kd(user.matches_won, user.matches_lost)} tone="text-brand" />
+            <StatBox label="Online V" value={user.online_wins} tone="text-emerald-400" />
+            <StatBox label="Online D" value={user.online_losses} tone="text-red-400" />
+          </div>
+          <p className="mt-3 text-xs text-ink-faint">
+            🔥 Sequência de login: {user.streak} dia(s) · 👥 {user.athlete_count} atleta(s)
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            <NumField label="Partidas jogadas" value={f.matches_played} onChange={(v) => set("matches_played", v)} min={0} max={1000000} />
+            <NumField label="Vitórias" value={f.matches_won} onChange={(v) => set("matches_won", v)} min={0} max={1000000} />
+            <NumField label="Derrotas" value={f.matches_lost} onChange={(v) => set("matches_lost", v)} min={0} max={1000000} />
+            <NumField label="Vitórias Online" value={f.online_wins} onChange={(v) => set("online_wins", v)} min={0} max={1000000} />
+            <NumField label="Derrotas Online" value={f.online_losses} onChange={(v) => set("online_losses", v)} min={0} max={1000000} />
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <Button size="sm" onClick={() => save.mutate({ userId: user.user_id, body: f }, { onSuccess: () => setOpen(false) })} disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar números
+            </Button>
+            {save.isError && <span className="text-sm text-red-400">Erro ao salvar.</span>}
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 

@@ -15,6 +15,9 @@ export function ChallengeBanner({ enabled }: { enabled: boolean }) {
 
   const incoming = data?.incoming ?? [];
   const activeId = data?.active_id ?? null;
+  // Só considera "em andamento" o que ainda exige ação (sala/partida rolando).
+  // Partida já encerrada não deve mais aparecer como pendente no banner.
+  const activePending = !!activeId && data?.active_status !== "finished";
 
   if (incoming.length > 0) {
     const c = incoming[0];
@@ -38,7 +41,7 @@ export function ChallengeBanner({ enabled }: { enabled: boolean }) {
     );
   }
 
-  if (activeId && !onOnlinePage) {
+  if (activePending && !onOnlinePage) {
     return (
       <Bar>
         <span className="flex items-center gap-2">

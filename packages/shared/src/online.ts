@@ -28,6 +28,7 @@ export interface Heartbeat {
   incoming: ChallengeBrief[];
   outgoing: ChallengeBrief[];
   active_id: string | null;
+  active_status: string | null;
 }
 
 export interface Challenge extends ChallengeBrief {
