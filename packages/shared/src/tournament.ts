@@ -73,3 +73,25 @@ export const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
   running: "Em andamento",
   finished: "Encerrado",
 };
+
+/** Nome legível da fase de uma partida (Oitavas/Quartas/Semis/Final/3º…). */
+export function matchRoundLabel(m: TournamentMatch, matches: TournamentMatch[]): string {
+  if (m.stage === "rr") return "Pontos corridos";
+  if (m.stage === "group") return `Grupo ${m.group_no ?? ""}`.trim();
+  if (m.stage === "bronze") return "Disputa de 3º lugar";
+  const rep = m.stage === "rep" || m.stage === "rep_final";
+  const koStages = rep ? ["rep", "rep_final"] : ["ko", "final"];
+  const totalRounds = matches
+    .filter((x) => koStages.includes(x.stage))
+    .reduce((mx, x) => Math.max(mx, x.round_no), 0);
+  const fromEnd = totalRounds - m.round_no; // 0 = final, 1 = semi, 2 = quartas…
+  const prefix = rep ? "Repescagem — " : "";
+  const names: Record<number, string> = {
+    0: "Final",
+    1: "Semifinais",
+    2: "Quartas de final",
+    3: "Oitavas de final",
+    4: "16-avos de final",
+  };
+  return prefix + (names[fromEnd] ?? `Rodada ${m.round_no}`);
+}

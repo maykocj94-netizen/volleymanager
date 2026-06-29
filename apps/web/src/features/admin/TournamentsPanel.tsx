@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, Loader2, Play, Plus, Save, Trash2, Flag, Users2 } from "lucide-react";
 import {
+  matchRoundLabel,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_TYPE_LABEL,
   type Athlete,
@@ -244,13 +245,20 @@ function Manage({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
       </Card>
 
-      {/* Partidas com definição de resultado */}
+      {/* Partidas com definição de resultado (agrupadas por fase) */}
       {data.matches.length > 0 && (
         <Card>
-          <p className="mb-2 font-semibold">Partidas — defina os placares</p>
-          <div className="space-y-2">
-            {data.matches.map((m) => (
-              <MatchRow key={m.id} tid={id} m={m} editable={t.status === "running"} />
+          <p className="mb-3 font-semibold">Partidas — defina os placares</p>
+          <div className="space-y-4">
+            {groupByRound(data.matches).map((g) => (
+              <div key={g.label}>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand">{g.label}</p>
+                <div className="space-y-2">
+                  {g.items.map((m) => (
+                    <MatchRow key={m.id} tid={id} m={m} editable={t.status === "running"} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </Card>
@@ -308,6 +316,17 @@ function EntryRow({
       )}
     </div>
   );
+}
+
+function groupByRound(matches: TournamentMatch[]): { label: string; items: TournamentMatch[] }[] {
+  const groups: { label: string; items: TournamentMatch[] }[] = [];
+  for (const m of matches) {
+    const label = matchRoundLabel(m, matches);
+    let g = groups.find((x) => x.label === label);
+    if (!g) { g = { label, items: [] }; groups.push(g); }
+    g.items.push(m);
+  }
+  return groups;
 }
 
 function MatchRow({ tid, m, editable }: { tid: string; m: TournamentMatch; editable: boolean }) {

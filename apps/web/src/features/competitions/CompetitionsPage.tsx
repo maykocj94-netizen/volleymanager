@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Loader2, Trophy, Users2, Lock } from "lucide-react";
 import {
+  matchRoundLabel,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_TYPE_LABEL,
   type Athlete,
   type Tournament,
   type TournamentDetail,
+  type TournamentMatch,
 } from "@volley/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -147,24 +149,43 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
       </Card>
 
-      {/* Partidas */}
-      {data.matches.length > 0 && (
-        <Card>
-          <p className="mb-2 font-semibold">Partidas</p>
-          <div className="space-y-1">
-            {data.matches.map((m) => (
-              <div key={m.id} className="flex items-center justify-between rounded bg-graphite/50 px-3 py-1.5 text-sm">
-                <span className={cn(m.winner_entry_id === m.entry_a_id && "font-semibold text-emerald-400")}>{m.a_name}</span>
-                <span className="tabular-nums text-ink-muted">
-                  {m.status === "done" ? `${m.score_a} x ${m.score_b}` : "—"}
-                </span>
-                <span className={cn(m.winner_entry_id === m.entry_b_id && "font-semibold text-emerald-400")}>{m.b_name}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {/* Partidas (agrupadas por fase) */}
+      {data.matches.length > 0 && <MatchesByRound matches={data.matches} />}
     </div>
+  );
+}
+
+function MatchesByRound({ matches }: { matches: TournamentMatch[] }) {
+  // Agrupa preservando a ordem de aparição (já vêm por round_no, order).
+  const groups: { label: string; items: TournamentMatch[] }[] = [];
+  for (const m of matches) {
+    const label = matchRoundLabel(m, matches);
+    let g = groups.find((x) => x.label === label);
+    if (!g) { g = { label, items: [] }; groups.push(g); }
+    g.items.push(m);
+  }
+  return (
+    <Card>
+      <p className="mb-2 font-semibold">Partidas</p>
+      <div className="space-y-4">
+        {groups.map((g) => (
+          <div key={g.label}>
+            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand">{g.label}</p>
+            <div className="space-y-1">
+              {g.items.map((m) => (
+                <div key={m.id} className="flex items-center justify-between gap-2 rounded bg-graphite/50 px-3 py-1.5 text-sm">
+                  <span className={cn("min-w-0 flex-1 truncate", m.winner_entry_id === m.entry_a_id && "font-semibold text-emerald-400")}>{m.a_name}</span>
+                  <span className="shrink-0 tabular-nums text-ink-muted">
+                    {m.status === "done" ? `${m.score_a} x ${m.score_b}` : "—"}
+                  </span>
+                  <span className={cn("min-w-0 flex-1 truncate text-right", m.winner_entry_id === m.entry_b_id && "font-semibold text-emerald-400")}>{m.b_name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

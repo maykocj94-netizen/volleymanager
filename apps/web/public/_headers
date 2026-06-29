@@ -1,0 +1,8 @@
+# Nunca cachear o service worker nem o HTML/manifest: garante que novas versões
+# publicadas no Netlify sejam detectadas e aplicadas (auto-update do PWA).
+/sw.js
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
