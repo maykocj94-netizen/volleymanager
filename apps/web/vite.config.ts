@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" + registro manual (main.tsx): aplica a nova versão e recarrega
+      // sozinho ao detectar um deploy novo, sem o usuário limpar cache.
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["favicon.svg", "robots.txt"],
       manifest: {
         name: "Volley Manager",
@@ -25,6 +28,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Remove caches de versões antigas ao ativar a nova (evita ficar preso
+        // numa build anterior).
+        cleanupOutdatedCaches: true,
         // Offline parcial: cacheia o app shell e respostas GET de leitura.
         runtimeCaching: [
           {
