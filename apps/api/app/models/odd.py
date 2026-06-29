@@ -11,12 +11,12 @@ Pagamento sempre arredonda PARA CIMA (ex.: 10 × 2.14 = 21.40 → 22).
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, Uuid, func
+from sqlalchemy import JSON, DateTime, Float, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
-ODD_TYPES = ("vitoria",)
+ODD_TYPES = ("vitoria", "placar")
 
 
 class Odd(Base):
@@ -31,9 +31,13 @@ class Odd(Base):
     team_a_odd: Mapped[float] = mapped_column(Float, default=2.0, nullable=False)
     team_b_name: Mapped[str] = mapped_column(String, default="Time B", nullable=False)
     team_b_odd: Mapped[float] = mapped_column(Float, default=2.0, nullable=False)
+    # Tipo "placar": alternativas com 1 multiplicador comum. Lista de
+    # { "key": "opt0", "label": "3 sets", "odd": 2.12 }.
+    options: Mapped[list] = mapped_column(JSON, default=list)
     # Ciclo de vida: open (aceita apostas) -> settled (liquidada) / cancelled.
     status: Mapped[str] = mapped_column(String, default="open", nullable=False)
-    winner: Mapped[str | None] = mapped_column(String, nullable=True)  # "a" | "b"
+    # Chave vencedora: "a"/"b" (vitoria) ou a key da alternativa (placar).
+    winner: Mapped[str | None] = mapped_column(String, nullable=True)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

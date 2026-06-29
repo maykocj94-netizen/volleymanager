@@ -380,7 +380,10 @@ async def admin_odd_detail(
 async def admin_create_odd(
     body: OddCreate, session: DbSession, _admin: AdminAuth
 ) -> OddOut:
-    row = await OddAdminService(session).create(body.model_dump())
+    try:
+        row = await OddAdminService(session).create(body.model_dump())
+    except OddError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return OddOut(**row)
 
 

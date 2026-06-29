@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Loader2, Ticket, TrendingUp, Check } from "lucide-react";
+import { Loader2, Ticket, TrendingUp, Check, History } from "lucide-react";
 import {
+  oddLabel,
+  oddOptions,
   oddPayout,
   type Odd,
   type OddBet,
   type OddCurrency,
-  type OddSelection,
 } from "@volley/shared";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,18 +24,29 @@ const BET_STATUS: Record<string, { label: string; cls: string }> = {
 export function OddsPage() {
   const { data: odds, isLoading, isError } = useOpenOdds();
   const { data: myBets } = useMyBets();
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <Ticket className="h-6 w-6 text-brand" /> Apostas
-        </h1>
-        <p className="text-sm text-ink-muted">
-          Aposte num confronto e ganhe pelo multiplicador (odd) se acertar. O pagamento
-          arredonda sempre para cima.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <Ticket className="h-6 w-6 text-brand" /> Apostas
+          </h1>
+          <p className="text-sm text-ink-muted">
+            Aposte num confronto e ganhe pelo multiplicador (odd) se acertar. O pagamento
+            arredonda sempre para cima.
+          </p>
+        </div>
+        <Button variant="subtle" onClick={() => setShowHistory((v) => !v)}>
+          <History className="h-4 w-4" /> Histórico de apostas
+          {!!myBets?.length && (
+            <span className="ml-1 rounded-full bg-brand/20 px-1.5 text-[10px] font-bold text-brand">{myBets.length}</span>
+          )}
+        </Button>
       </header>
+
+      {showHistory && <History_ bets={myBets ?? []} />}
 
       {isError ? (
         <Card className="text-ink-muted">Não foi possível carregar as apostas.</Card>
@@ -51,8 +63,6 @@ export function OddsPage() {
           ))}
         </div>
       )}
-
-      {!!myBets?.length && <MyBets bets={myBets} />}
     </div>
   );
 }
@@ -60,12 +70,13 @@ export function OddsPage() {
 function OddCard({ odd: o }: { odd: Odd }) {
   const { data: me } = useMe();
   const place = usePlaceBet();
-  const [sel, setSel] = useState<OddSelection | null>(null);
+  const [sel, setSel] = useState<string | null>(null);
   const [currency, setCurrency] = useState<OddCurrency>("silver");
   const [amount, setAmount] = useState("");
+  const options = oddOptions(o);
 
   const amt = Math.max(0, Math.floor(Number(amount) || 0));
-  const oddValue = sel === "a" ? o.team_a_odd : sel === "b" ? o.team_b_odd : 0;
+  const oddValue = options.find((op) => op.key === sel)?.odd ?? 0;
   const potential = sel ? oddPayout(amt, oddValue) : 0;
   const balance = currency === "gold" ? me?.gold ?? 0 : me?.silver ?? 0;
   const canBet = !!sel && amt >= 1 && amt <= balance;
@@ -85,19 +96,16 @@ function OddCard({ odd: o }: { odd: Odd }) {
         {o.description && <p className="text-xs text-ink-muted">{o.description}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <SideButton
-          name={o.team_a_name}
-          odd={o.team_a_odd}
-          active={sel === "a"}
-          onClick={() => setSel("a")}
-        />
-        <SideButton
-          name={o.team_b_name}
-          odd={o.team_b_odd}
-          active={sel === "b"}
-          onClick={() => setSel("b")}
-        />
+      <div className={cn("grid gap-2", options.length <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
+        {options.map((op) => (
+          <SideButton
+            key={op.key}
+            name={op.label}
+            odd={op.odd}
+            active={sel === op.key}
+            onClick={() => setSel(op.key)}
+          />
+        ))}
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
@@ -126,7 +134,7 @@ function OddCard({ odd: o }: { odd: Odd }) {
             className="input"
           />
         </label>
-        <Button onClick={bet} disabled={place.isPending || !canBet} title={canBet ? "" : "Escolha um lado e um valor válido"}>
+        <Button onClick={bet} disabled={place.isPending || !canBet} title={canBet ? "" : "Escolha uma opção e um valor válido"}>
           {place.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
           Apostar
         </Button>
@@ -134,7 +142,7 @@ function OddCard({ odd: o }: { odd: Odd }) {
 
       {sel && amt >= 1 && (
         <p className="text-sm text-ink-muted">
-          Aposta de <b className="text-ink">{amt}</b> em <b className="text-ink">{sel === "a" ? o.team_a_name : o.team_b_name}</b> ({oddValue.toFixed(2)}x) →
+          Aposta de <b className="text-ink">{amt}</b> em <b className="text-ink">{oddLabel(o, sel)}</b> ({oddValue.toFixed(2)}x) →
           se ganhar, recebe <b className="text-emerald-400">{potential.toLocaleString("pt-BR")} {currency === "gold" ? "🥇" : "🥈"}</b>
         </p>
       )}
@@ -150,7 +158,7 @@ function OddCard({ odd: o }: { odd: Odd }) {
           {o.my_bets.map((b) => (
             <p key={b.id}>
               {b.amount} {b.currency === "gold" ? "🥇" : "🥈"} em{" "}
-              {b.selection === "a" ? o.team_a_name : o.team_b_name} ({b.odd_value.toFixed(2)}x) →
+              {b.selection_label || oddLabel(o, b.selection)} ({b.odd_value.toFixed(2)}x) →
               ganharia {oddPayout(b.amount, b.odd_value).toLocaleString("pt-BR")}
             </p>
           ))}
@@ -169,26 +177,39 @@ function SideButton({
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-0.5 rounded-lg border px-3 py-3 transition-colors",
+        "flex flex-col items-center gap-0.5 rounded-lg border px-3 py-3 text-center transition-colors",
         active ? "border-brand bg-brand/10" : "border-graphite-border bg-graphite hover:bg-graphite-light",
       )}
     >
       <span className="flex items-center gap-1 font-semibold">
-        {active && <Check className="h-4 w-4 text-brand" />} {name}
+        {active && <Check className="h-4 w-4 shrink-0 text-brand" />} {name}
       </span>
       <span className="text-xl font-black tabular-nums text-brand">{odd.toFixed(2)}x</span>
     </button>
   );
 }
 
-function MyBets({ bets }: { bets: OddBet[] }) {
+/** Histórico completo de apostas do usuário (todas, com resultado). */
+function History_({ bets }: { bets: OddBet[] }) {
+  if (!bets.length) {
+    return <Card className="text-sm text-ink-muted">Você ainda não fez nenhuma aposta.</Card>;
+  }
+  const open = bets.filter((b) => b.status === "pending").length;
+  const won = bets.filter((b) => b.status === "won");
+  const wonTotal = won.reduce((s, b) => s + b.payout, 0);
   return (
     <Card>
-      <p className="mb-2 font-semibold">Minhas apostas</p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold">Histórico de apostas</p>
+        <p className="text-xs text-ink-muted">
+          {bets.length} no total · {open} em aberto · {won.length} ganha(s)
+          {wonTotal > 0 && <> · +{wonTotal.toLocaleString("pt-BR")} recebido</>}
+        </p>
+      </div>
       <div className="space-y-1.5">
         {bets.map((b) => {
-          const st = BET_STATUS[b.status] ?? BET_STATUS.pending;
-          const side = b.selection === "a" ? b.team_a_name : b.team_b_name;
+          const stt = BET_STATUS[b.status] ?? BET_STATUS.pending;
+          const side = b.selection_label || (b.selection === "a" ? b.team_a_name : b.selection === "b" ? b.team_b_name : b.selection);
           return (
             <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-graphite px-3 py-2 text-sm">
               <span className="min-w-0">
@@ -197,8 +218,9 @@ function MyBets({ bets }: { bets: OddBet[] }) {
               </span>
               <span className="flex items-center gap-2">
                 {b.status === "won" && <span className="text-emerald-400">+{b.payout.toLocaleString("pt-BR")}</span>}
+                {b.status === "lost" && <span className="text-red-400">−{b.amount.toLocaleString("pt-BR")}</span>}
                 {b.status === "refunded" && <span className="text-ink-muted">devolvido {b.payout.toLocaleString("pt-BR")}</span>}
-                <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold uppercase", st.cls)}>{st.label}</span>
+                <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold uppercase", stt.cls)}>{stt.label}</span>
               </span>
             </div>
           );

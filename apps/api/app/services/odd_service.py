@@ -32,11 +32,33 @@ def payout_for(amount: int, odd_value: float) -> int:
     return int(math.ceil(amount * float(odd_value)))
 
 
+def options_of(o: Odd) -> list[dict]:
+    """Opções da aposta, unificadas: vitória (A/B) e placar (alternativas)."""
+    if o.type == "placar":
+        return [dict(opt) for opt in (o.options or [])]
+    return [
+        {"key": "a", "label": o.team_a_name, "odd": o.team_a_odd},
+        {"key": "b", "label": o.team_b_name, "odd": o.team_b_odd},
+    ]
+
+
+def _option_map(o: Odd) -> dict[str, dict]:
+    return {opt["key"]: opt for opt in options_of(o)}
+
+
+def label_of(o: Odd, key: str | None) -> str:
+    if key is None:
+        return ""
+    opt = _option_map(o).get(key)
+    return opt["label"] if opt else key
+
+
 def _odd_dict(o: Odd, bet_count: int = 0) -> dict:
     return {
         "id": o.id, "title": o.title, "type": o.type, "description": o.description,
         "team_a_name": o.team_a_name, "team_a_odd": o.team_a_odd,
         "team_b_name": o.team_b_name, "team_b_odd": o.team_b_odd,
+        "options": options_of(o),
         "status": o.status, "winner": o.winner, "bet_count": bet_count,
     }
 
@@ -44,9 +66,11 @@ def _odd_dict(o: Odd, bet_count: int = 0) -> dict:
 def _bet_ctx(b: OddBet, o: Odd | None) -> dict:
     return {
         "id": b.id, "odd_id": b.odd_id, "selection": b.selection,
+        "selection_label": label_of(o, b.selection) if o else b.selection,
         "currency": b.currency, "amount": b.amount, "odd_value": b.odd_value,
         "status": b.status, "payout": b.payout,
         "odd_title": o.title if o else "",
+        "odd_type": o.type if o else "",
         "team_a_name": o.team_a_name if o else "",
         "team_b_name": o.team_b_name if o else "",
         "odd_status": o.status if o else "",
@@ -83,13 +107,15 @@ class OddService:
     async def place_bet(
         self, user_id: uuid.UUID, odd_id: uuid.UUID, selection: str, currency: str, amount: int
     ) -> tuple[UserState, OddBet, Odd]:
-        if selection not in ("a", "b"):
-            raise OddError("Lado inválido.")
         if amount <= 0:
             raise OddError("Informe um valor de aposta válido.")
         odd = await self.session.get(Odd, odd_id)
         if odd is None or odd.status != "open":
             raise NotFound("Aposta indisponível (fechada ou removida).")
+
+        option = _option_map(odd).get(selection)
+        if option is None:
+            raise OddError("Opção inválida.")
 
         state = await UserRepository(self.session).get_or_create_state(user_id)
         bal = state.gold if currency == "gold" else state.silver
@@ -102,7 +128,7 @@ class OddService:
         else:
             state.silver -= amount
 
-        odd_value = odd.team_a_odd if selection == "a" else odd.team_b_odd
+        odd_value = option["odd"]
         bet = OddBet(
             id=uuid.uuid4(), odd_id=odd_id, user_id=user_id, selection=selection,
             currency=currency, amount=amount, odd_value=float(odd_value), status="pending",
@@ -148,18 +174,35 @@ class OddAdminService:
         )).scalars().all())
         return odd, bets, len(bets)
 
+    @staticmethod
+    def _build_options(multiplier: float, alternatives: list) -> list[dict]:
+        if multiplier < 1.0:
+            raise OddError("Informe um multiplicador válido (>= 1).")
+        alts = [str(a).strip() for a in (alternatives or []) if str(a).strip()]
+        if len(alts) < 2:
+            raise OddError("Adicione pelo menos 2 alternativas.")
+        return [{"key": f"opt{i}", "label": a, "odd": float(multiplier)} for i, a in enumerate(alts)]
+
     async def create(self, data: dict) -> dict:
+        otype = data.get("type", "vitoria")
         odd = Odd(
             id=uuid.uuid4(),
             title=data["title"],
-            type=data.get("type", "vitoria"),
+            type=otype,
             description=data.get("description"),
-            team_a_name=data["team_a_name"],
-            team_a_odd=float(data["team_a_odd"]),
-            team_b_name=data["team_b_name"],
-            team_b_odd=float(data["team_b_odd"]),
             status="open",
         )
+        if otype == "placar":
+            odd.options = self._build_options(
+                float(data.get("multiplier") or 0), data.get("alternatives") or []
+            )
+        else:
+            if not data.get("team_a_name") or not data.get("team_b_name"):
+                raise OddError("Informe os dois times do confronto.")
+            odd.team_a_name = data["team_a_name"]
+            odd.team_a_odd = float(data["team_a_odd"])
+            odd.team_b_name = data["team_b_name"]
+            odd.team_b_odd = float(data["team_b_odd"])
         self.session.add(odd)
         await self.session.flush()
         return _odd_dict(odd, 0)
@@ -170,24 +213,39 @@ class OddAdminService:
             raise NotFound("Aposta não encontrada.")
         if odd.status != "open":
             raise OddError("Só dá para editar uma aposta aberta.")
-        for key in ("title", "description", "team_a_name", "team_b_name"):
+        for key in ("title", "description"):
             if data.get(key) is not None:
                 setattr(odd, key, data[key])
-        for key in ("team_a_odd", "team_b_odd"):
-            if data.get(key) is not None:
-                setattr(odd, key, float(data[key]))
+        if odd.type == "placar":
+            if data.get("multiplier") is not None or data.get("alternatives") is not None:
+                mult = float(
+                    data.get("multiplier")
+                    if data.get("multiplier") is not None
+                    else (odd.options[0]["odd"] if odd.options else 2.0)
+                )
+                alts = data.get("alternatives")
+                if alts is None:
+                    alts = [o["label"] for o in (odd.options or [])]
+                odd.options = self._build_options(mult, alts)
+        else:
+            for key in ("team_a_name", "team_b_name"):
+                if data.get(key) is not None:
+                    setattr(odd, key, data[key])
+            for key in ("team_a_odd", "team_b_odd"):
+                if data.get(key) is not None:
+                    setattr(odd, key, float(data[key]))
         await self.session.flush()
         return _odd_dict(odd, 0)
 
     async def settle(self, odd_id: uuid.UUID, winner: str) -> dict:
         """Define o vencedor e paga as apostas vencedoras (ceil do multiplicador)."""
-        if winner not in ("a", "b"):
-            raise OddError("Vencedor inválido.")
         odd = await self.session.get(Odd, odd_id)
         if odd is None:
             raise NotFound("Aposta não encontrada.")
         if odd.status != "open":
             raise OddError("Esta aposta já foi liquidada ou cancelada.")
+        if winner not in _option_map(odd):
+            raise OddError("Opção vencedora inválida.")
 
         bets = (await self.session.execute(
             select(OddBet).where(OddBet.odd_id == odd_id, OddBet.status == "pending")

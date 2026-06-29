@@ -8,8 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.user import UserStateOut
 
-Selection = Literal["a", "b"]
 Currency = Literal["silver", "gold"]
+
+
+class OddOption(BaseModel):
+    key: str
+    label: str
+    odd: float
 
 
 class OddOut(BaseModel):
@@ -23,6 +28,7 @@ class OddOut(BaseModel):
     team_a_odd: float
     team_b_name: str
     team_b_odd: float
+    options: list[OddOption] = []
     status: str
     winner: str | None = None
     # Agregados (preenchidos pelo serviço).
@@ -32,12 +38,16 @@ class OddOut(BaseModel):
 
 class OddCreate(BaseModel):
     title: str = Field(min_length=1, max_length=100)
-    type: Literal["vitoria"] = "vitoria"
+    type: Literal["vitoria", "placar"] = "vitoria"
     description: str | None = Field(default=None, max_length=240)
-    team_a_name: str = Field(min_length=1, max_length=60)
-    team_a_odd: float = Field(ge=1.0, le=1000.0)
-    team_b_name: str = Field(min_length=1, max_length=60)
-    team_b_odd: float = Field(ge=1.0, le=1000.0)
+    # Tipo "vitoria": confronto Time A x Time B.
+    team_a_name: str | None = Field(default=None, max_length=60)
+    team_a_odd: float | None = Field(default=None, ge=1.0, le=1000.0)
+    team_b_name: str | None = Field(default=None, max_length=60)
+    team_b_odd: float | None = Field(default=None, ge=1.0, le=1000.0)
+    # Tipo "placar": 1 multiplicador comum + alternativas.
+    multiplier: float | None = Field(default=None, ge=1.0, le=1000.0)
+    alternatives: list[str] | None = None
 
 
 class OddUpdate(BaseModel):
@@ -47,15 +57,17 @@ class OddUpdate(BaseModel):
     team_a_odd: float | None = Field(default=None, ge=1.0, le=1000.0)
     team_b_name: str | None = Field(default=None, min_length=1, max_length=60)
     team_b_odd: float | None = Field(default=None, ge=1.0, le=1000.0)
+    multiplier: float | None = Field(default=None, ge=1.0, le=1000.0)
+    alternatives: list[str] | None = None
 
 
 class SettleRequest(BaseModel):
-    winner: Selection
+    winner: str = Field(min_length=1, max_length=20)
 
 
 class PlaceBetRequest(BaseModel):
     odd_id: uuid.UUID
-    selection: Selection
+    selection: str = Field(min_length=1, max_length=20)
     currency: Currency = "silver"
     amount: int = Field(ge=1, le=100_000_000)
 
@@ -66,13 +78,15 @@ class OddBetOut(BaseModel):
     id: uuid.UUID
     odd_id: uuid.UUID
     selection: str
+    selection_label: str = ""
     currency: str
     amount: int
     odd_value: float
     status: str
     payout: int
-    # Contexto da Odd (para a tela "minhas apostas").
+    # Contexto da Odd (para a tela "minhas apostas" / histórico).
     odd_title: str = ""
+    odd_type: str = ""
     team_a_name: str = ""
     team_b_name: str = ""
     odd_status: str = ""

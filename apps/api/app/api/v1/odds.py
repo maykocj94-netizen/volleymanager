@@ -7,7 +7,13 @@ from fastapi import APIRouter, HTTPException
 from app.core.deps import CurrentUser, DbSession
 from app.repositories.user_repo import UserRepository
 from app.schemas.odd import OddBetOut, OddOut, PlaceBetRequest, PlaceBetResult
-from app.services.odd_service import InsufficientFunds, NotFound, OddError, OddService
+from app.services.odd_service import (
+    InsufficientFunds,
+    NotFound,
+    OddError,
+    OddService,
+    label_of,
+)
 
 router = APIRouter(prefix="/odds", tags=["odds"])
 
@@ -41,6 +47,8 @@ async def place_bet(body: PlaceBetRequest, session: DbSession, user: CurrentUser
     club = await UserRepository(session).get_main_club(uid)
     out = OddBetOut.model_validate(bet)
     out.odd_title = odd.title
+    out.odd_type = odd.type
+    out.selection_label = label_of(odd, bet.selection)
     out.team_a_name = odd.team_a_name
     out.team_b_name = odd.team_b_name
     out.odd_status = odd.status
