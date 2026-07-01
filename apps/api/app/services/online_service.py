@@ -125,23 +125,39 @@ class OnlineService:
             "bet_amount": c.bet_amount, "status": c.status,
         }
 
+    async def _active_match(self, user_id: uuid.UUID) -> Challenge | None:
+        """Partida já em andamento (aceita/rodando) em que o usuário está."""
+        return (
+            await self.session.execute(
+                select(Challenge).where(
+                    or_(Challenge.challenger_id == user_id, Challenge.opponent_id == user_id),
+                    Challenge.status.in_(("accepted", "running")),
+                ).limit(1)
+            )
+        ).scalars().first()
+
     async def create_challenge(
         self, challenger_id: uuid.UUID, opponent_id: uuid.UUID,
         kind: str, sex: str, currency: str, amount: int,
     ) -> Challenge:
         if opponent_id == challenger_id:
             raise OnlineError("Você não pode desafiar a si mesmo.")
-        # um desafio ativo por vez (como desafiante)
-        existing = (
+        # Pode desafiar VÁRIOS ao mesmo tempo (vários pendentes). Só não pode
+        # abrir novos se já estiver numa partida em andamento.
+        if await self._active_match(challenger_id) is not None:
+            raise OnlineError("Você já está em uma partida em andamento.")
+        # Evita desafiar o mesmo treinador duas vezes (pendente duplicado).
+        dup = (
             await self.session.execute(
                 select(Challenge).where(
-                    or_(Challenge.challenger_id == challenger_id, Challenge.opponent_id == challenger_id),
-                    Challenge.status.in_(_ACTIVE),
+                    Challenge.challenger_id == challenger_id,
+                    Challenge.opponent_id == opponent_id,
+                    Challenge.status == "pending",
                 )
             )
         ).scalars().first()
-        if existing is not None:
-            raise OnlineError("Você já tem um desafio em andamento.")
+        if dup is not None:
+            raise OnlineError("Você já desafiou este treinador (aguardando resposta).")
         my_club = await self._club(challenger_id)
         opp_club = await self._club(opponent_id)
         if my_club is None or opp_club is None:
@@ -168,7 +184,41 @@ class OnlineService:
             raise OnlineError("Só o desafiado pode responder.")
         if c.status != "pending":
             raise OnlineError("Este convite não está mais pendente.")
-        c.status = "accepted" if accept else "declined"
+        if not accept:
+            c.status = "declined"
+            await self.session.flush()
+            return c
+
+        # Aceitar: o PRIMEIRO a aceitar define o confronto. Se o desafiante (ou
+        # quem aceita) já entrou em outra partida, recusa este convite.
+        if await self._active_match(c.challenger_id) is not None:
+            c.status = "declined"
+            await self.session.flush()
+            raise OnlineError("O desafiante já entrou em outra partida.")
+        if await self._active_match(user_id) is not None:
+            c.status = "declined"
+            await self.session.flush()
+            raise OnlineError("Você já está em uma partida.")
+
+        c.status = "accepted"
+        await self.session.flush()
+        # Cancela os demais convites pendentes que envolvam o desafiante ou quem
+        # aceitou (o confronto foi definido pelo primeiro aceite).
+        parties = [c.challenger_id, user_id]
+        others = (
+            await self.session.execute(
+                select(Challenge).where(
+                    Challenge.status == "pending",
+                    Challenge.id != c.id,
+                    or_(
+                        Challenge.challenger_id.in_(parties),
+                        Challenge.opponent_id.in_(parties),
+                    ),
+                )
+            )
+        ).scalars().all()
+        for o in others:
+            o.status = "cancelled"
         await self.session.flush()
         return c
 

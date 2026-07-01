@@ -44,7 +44,10 @@ export function OnlineMatchPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold">Partida Online (X1)</h1>
-        <p className="text-sm text-ink-muted">Desafie outros treinadores e aposte moedas. O vencedor leva tudo.</p>
+        <p className="text-sm text-ink-muted">
+          Desafie vários treinadores ao mesmo tempo — quem aceitar primeiro é quem você enfrenta.
+          O vencedor leva a aposta.
+        </p>
       </header>
       {showLobby ? (
         <LobbyView key={activeId} id={activeId} onLeave={() => setViewingId(null)} />
@@ -174,9 +177,7 @@ function ChallengeDialog({ user, onClose }: { user: OnlineUser; onClose: () => v
           </Button>
         </div>
         {create.isError && (
-          <p className="mt-2 text-sm text-red-400">
-            {String(create.error).includes("409") ? "Você já tem um desafio em andamento." : "Erro ao desafiar."}
-          </p>
+          <p className="mt-2 text-sm text-red-400">{errMsg(create.error)}</p>
         )}
       </div>
     </div>
