@@ -109,6 +109,7 @@ class OddBetAdminOut(BaseModel):
 
     id: uuid.UUID
     user_id: uuid.UUID
+    team_name: str = ""
     selection: str
     currency: str
     amount: int

@@ -35,7 +35,7 @@ function fmtDeadline(iso: string | null): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-export function OddsPanel() {
+export function OddsPanel({ onViewAccount }: { onViewAccount: (userId: string) => void }) {
   const { data: odds, isLoading } = useAdminOdds();
   return (
     <div className="space-y-5">
@@ -49,7 +49,7 @@ export function OddsPanel() {
         ) : (
           <div className="space-y-2">
             {odds.map((o) => (
-              <OddRow key={o.id} odd={o} />
+              <OddRow key={o.id} odd={o} onViewAccount={onViewAccount} />
             ))}
           </div>
         )}
@@ -205,7 +205,7 @@ function CreateForm() {
   );
 }
 
-function OddRow({ odd: o }: { odd: Odd }) {
+function OddRow({ odd: o, onViewAccount }: { odd: Odd; onViewAccount: (userId: string) => void }) {
   const [open, setOpen] = useState(false);
   const [finalize, setFinalize] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -287,7 +287,7 @@ function OddRow({ odd: o }: { odd: Odd }) {
         </div>
       )}
 
-      {open && <OddBets oddId={o.id} />}
+      {open && <OddBets oddId={o.id} onViewAccount={onViewAccount} />}
     </Card>
   );
 }
@@ -377,7 +377,7 @@ function EditForm({ odd: o, onDone }: { odd: Odd; onDone: () => void }) {
   );
 }
 
-function OddBets({ oddId }: { oddId: string }) {
+function OddBets({ oddId, onViewAccount }: { oddId: string; onViewAccount: (userId: string) => void }) {
   const { data, isLoading } = useAdminOddDetail(oddId);
   if (isLoading) return <p className="py-2 text-xs text-ink-faint">Carregando apostas…</p>;
   if (!data?.bets.length) return <p className="py-2 text-xs text-ink-faint">Ninguém apostou ainda.</p>;
@@ -385,11 +385,18 @@ function OddBets({ oddId }: { oddId: string }) {
   const total = data.bets.reduce((s, b) => s + b.amount, 0);
   return (
     <div className="space-y-1 border-t border-graphite-border pt-2 text-xs">
-      <p className="text-ink-muted">{data.bets.length} aposta(s) · total apostado {total}</p>
+      <p className="text-ink-muted">{data.bets.length} aposta(s) · total apostado {total} · clique no nome para ver a conta</p>
       {data.bets.map((b) => (
-        <div key={b.id} className="flex items-center justify-between rounded bg-graphite/50 px-2 py-1">
-          <span className="truncate text-ink-muted">
-            {b.user_id.slice(0, 8)}… · {b.amount} {b.currency === "gold" ? "🥇" : "🥈"} em{" "}
+        <div key={b.id} className="flex items-center justify-between gap-2 rounded bg-graphite/50 px-2 py-1">
+          <span className="min-w-0 truncate text-ink-muted">
+            <button
+              onClick={() => onViewAccount(b.user_id)}
+              className="font-semibold text-brand hover:underline"
+              title="Ver a conta deste apostador"
+            >
+              👤 {b.team_name}
+            </button>{" "}
+            · {b.amount} {b.currency === "gold" ? "🥇" : "🥈"} em{" "}
             {oddLabel(o, b.selection)} ({b.odd_value.toFixed(2)}x)
           </span>
           <span className={cn(

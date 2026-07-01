@@ -63,6 +63,7 @@ export interface PlaceBetResult {
 export interface OddBetAdmin {
   id: string;
   user_id: string;
+  team_name: string;
   selection: OddSelection;
   currency: OddCurrency;
   amount: number;

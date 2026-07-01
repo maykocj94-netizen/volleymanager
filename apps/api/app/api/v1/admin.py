@@ -408,7 +408,7 @@ async def admin_odd_detail(
     from app.services.odd_service import _odd_dict
     return OddAdminDetailOut(
         odd=OddOut(**_odd_dict(odd, count)),
-        bets=[OddBetAdminOut.model_validate(b) for b in bets],
+        bets=[OddBetAdminOut(**b) for b in bets],
     )
 
 

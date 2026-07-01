@@ -179,14 +179,24 @@ class OddAdminService:
             out.append(_odd_dict(o, int(count)))
         return out
 
-    async def get_detail(self, odd_id: uuid.UUID) -> tuple[Odd, list[OddBet], int]:
+    async def get_detail(self, odd_id: uuid.UUID) -> tuple[Odd, list[dict], int]:
         odd = await self.session.get(Odd, odd_id)
         if odd is None:
             raise NotFound("Aposta não encontrada.")
         bets = list((await self.session.execute(
             select(OddBet).where(OddBet.odd_id == odd_id).order_by(OddBet.created_at.desc())
         )).scalars().all())
-        return odd, bets, len(bets)
+        repo = UserRepository(self.session)
+        out: list[dict] = []
+        for b in bets:
+            club = await repo.get_main_club(b.user_id)
+            out.append({
+                "id": b.id, "user_id": b.user_id, "selection": b.selection,
+                "currency": b.currency, "amount": b.amount, "odd_value": b.odd_value,
+                "status": b.status, "payout": b.payout,
+                "team_name": club.name if club else "—",
+            })
+        return odd, out, len(out)
 
     @staticmethod
     def _build_options(multiplier: float, alternatives: list) -> list[dict]:

@@ -136,7 +136,7 @@ export function AdminPanel() {
       {tab === "anuncios" && <ListingsPanel onViewAccount={viewAccount} />}
       {tab === "torneios" && <TournamentsPanel />}
       {tab === "loja" && <ProductsPanel />}
-      {tab === "odd" && <OddsPanel />}
+      {tab === "odd" && <OddsPanel onViewAccount={viewAccount} />}
       {tab === "lootbox" && <LootboxPanel />}
     </div>
   );
