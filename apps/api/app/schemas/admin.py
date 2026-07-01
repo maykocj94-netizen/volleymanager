@@ -78,6 +78,11 @@ class AthletePatch(BaseModel):
     level: int | None = Field(default=None, ge=1, le=999)
     current_ability: int | None = Field(default=None, ge=0, le=100)
     potential_ability: int | None = Field(default=None, ge=0, le=100)
+    # Estatísticas de partidas (Single/offline e Online X1).
+    wins: int | None = Field(default=None, ge=0, le=1_000_000)
+    losses: int | None = Field(default=None, ge=0, le=1_000_000)
+    online_wins: int | None = Field(default=None, ge=0, le=1_000_000)
+    online_losses: int | None = Field(default=None, ge=0, le=1_000_000)
     morale: int | None = Field(default=None, ge=0, le=100)
     fatigue: int | None = Field(default=None, ge=0, le=100)
     form: int | None = Field(default=None, ge=0, le=100)

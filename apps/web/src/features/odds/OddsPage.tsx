@@ -78,6 +78,7 @@ function OddCard({ odd: o }: { odd: Odd }) {
   const [sel, setSel] = useState<string | null>(null);
   const [currency, setCurrency] = useState<OddCurrency>("silver");
   const [amount, setAmount] = useState("");
+  const [selHint, setSelHint] = useState(false);
   const options = oddOptions(o);
 
   const amt = Math.max(0, Math.floor(Number(amount) || 0));
@@ -85,13 +86,25 @@ function OddCard({ odd: o }: { odd: Odd }) {
   const potential = sel ? oddPayout(amt, oddValue) : 0;
   const balance = currency === "gold" ? me?.gold ?? 0 : me?.silver ?? 0;
   const closed = !o.betting_open;
-  const canBet = !closed && !!sel && amt >= 1 && amt <= balance;
+  // O botão fica ativo com um valor válido; a escolha do time é validada no clique
+  // (com aviso), para o usuário nunca ficar com um botão "morto" sem explicação.
+  const validAmount = amt >= 1 && amt <= balance;
+
+  function pick(key: string) {
+    setSel(key);
+    setSelHint(false);
+  }
 
   function bet() {
-    if (!sel) return;
+    if (closed) return;
+    if (!sel) {
+      setSelHint(true);
+      return;
+    }
+    if (amt < 1 || amt > balance) return;
     place.mutate(
       { odd_id: o.id, selection: sel, currency, amount: amt },
-      { onSuccess: () => setAmount("") },
+      { onSuccess: () => { setAmount(""); setSelHint(false); } },
     );
   }
 
@@ -114,6 +127,11 @@ function OddCard({ odd: o }: { odd: Odd }) {
         </p>
       )}
 
+      {!closed && (
+        <p className="text-xs text-ink-muted">
+          <b className="text-ink">1.</b> Toque no time em que quer apostar:
+        </p>
+      )}
       <div className={cn("grid gap-2", options.length <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
         {options.map((op) => (
           <SideButton
@@ -121,11 +139,21 @@ function OddCard({ odd: o }: { odd: Odd }) {
             name={op.label}
             odd={op.odd}
             active={sel === op.key}
-            onClick={() => setSel(op.key)}
+            onClick={() => pick(op.key)}
           />
         ))}
       </div>
+      {selHint && !sel && (
+        <p className="rounded bg-amber-500/10 px-2 py-1 text-sm font-medium text-amber-300">
+          👆 Escolha um time acima antes de apostar.
+        </p>
+      )}
 
+      {!closed && sel && (
+        <p className="text-xs text-ink-muted">
+          <b className="text-ink">2.</b> Valor e moeda, e toque em Apostar:
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex gap-1">
           {(["silver", "gold"] as const).map((cur) => (
@@ -152,9 +180,13 @@ function OddCard({ odd: o }: { odd: Odd }) {
             className="input"
           />
         </label>
-        <Button onClick={bet} disabled={place.isPending || !canBet} title={canBet ? "" : "Escolha uma opção e um valor válido"}>
+        <Button
+          onClick={bet}
+          disabled={place.isPending || closed || !validAmount}
+          title={validAmount ? "" : "Informe um valor válido (dentro do saldo)"}
+        >
           {place.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
-          Apostar
+          Apostar{sel ? ` em ${oddLabel(o, sel)}` : ""}
         </Button>
       </div>
 

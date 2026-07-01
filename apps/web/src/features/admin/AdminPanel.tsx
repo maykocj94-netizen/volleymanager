@@ -843,6 +843,10 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
   const [level, setLevel] = useState(athlete.level);
   const [ca, setCa] = useState(athlete.current_ability);
   const [pa, setPa] = useState(athlete.potential_ability);
+  const [wins, setWins] = useState(athlete.wins);
+  const [losses, setLosses] = useState(athlete.losses);
+  const [onlineWins, setOnlineWins] = useState(athlete.online_wins);
+  const [onlineLosses, setOnlineLosses] = useState(athlete.online_losses);
   const [attrs, setAttrs] = useState<AthleteAttributes>(athlete.attributes ?? ({} as AthleteAttributes));
   const pos = athlete.beach_position ?? athlete.court_position ?? "";
   const ailing = athlete.condition !== "ok";
@@ -858,6 +862,10 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
         level,
         current_ability: ca,
         potential_ability: pa,
+        wins,
+        losses,
+        online_wins: onlineWins,
+        online_losses: onlineLosses,
         attributes: attrs,
       },
     });
@@ -910,6 +918,14 @@ function AthleteAdminRow({ athlete, userId }: { athlete: Athlete; userId: string
             <NumField label="Habilidade (HAB)" value={ca} onChange={setCa} />
             <NumField label="Potencial (POT)" value={pa} onChange={setPa} />
           </div>
+          <p className="mb-1 text-xs uppercase tracking-wide text-ink-faint">Estatísticas (partidas)</p>
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <NumField label="Vitórias (Single)" value={wins} onChange={setWins} min={0} max={1000000} />
+            <NumField label="Derrotas (Single)" value={losses} onChange={setLosses} min={0} max={1000000} />
+            <NumField label="Vitórias Online" value={onlineWins} onChange={setOnlineWins} min={0} max={1000000} />
+            <NumField label="Derrotas Online" value={onlineLosses} onChange={setOnlineLosses} min={0} max={1000000} />
+          </div>
+          <p className="mb-1 text-xs uppercase tracking-wide text-ink-faint">Atributos</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {ATTR_KEYS.map((k) => (
               <NumField key={k} label={ATTRIBUTE_LABEL[k]} value={(attrs[k] as number) ?? 0}
