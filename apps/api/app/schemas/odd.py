@@ -31,6 +31,8 @@ class OddOut(BaseModel):
     options: list[OddOption] = []
     status: str
     winner: str | None = None
+    closes_at: datetime | None = None
+    betting_open: bool = True
     # Agregados (preenchidos pelo serviço).
     bet_count: int = 0
     my_bets: list["OddBetOut"] = []
@@ -48,6 +50,8 @@ class OddCreate(BaseModel):
     # Tipo "placar": 1 multiplicador comum + alternativas.
     multiplier: float | None = Field(default=None, ge=1.0, le=1000.0)
     alternatives: list[str] | None = None
+    # Prazo para apostar (opcional). Após isso, ninguém mais aposta.
+    closes_at: datetime | None = None
 
 
 class OddUpdate(BaseModel):
@@ -59,6 +63,7 @@ class OddUpdate(BaseModel):
     team_b_odd: float | None = Field(default=None, ge=1.0, le=1000.0)
     multiplier: float | None = Field(default=None, ge=1.0, le=1000.0)
     alternatives: list[str] | None = None
+    closes_at: datetime | None = None
 
 
 class SettleRequest(BaseModel):

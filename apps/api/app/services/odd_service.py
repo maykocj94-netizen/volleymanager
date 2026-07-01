@@ -27,6 +27,17 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _aware(dt: datetime) -> datetime:
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def _betting_open(o: Odd) -> bool:
+    """Aceita apostas? Aberta e ainda dentro do prazo (se houver)."""
+    if o.status != "open":
+        return False
+    return o.closes_at is None or _aware(o.closes_at) > _now()
+
+
 def payout_for(amount: int, odd_value: float) -> int:
     """Pagamento da aposta vencedora: ceil(valor × multiplicador)."""
     return int(math.ceil(amount * float(odd_value)))
@@ -60,6 +71,7 @@ def _odd_dict(o: Odd, bet_count: int = 0) -> dict:
         "team_b_name": o.team_b_name, "team_b_odd": o.team_b_odd,
         "options": options_of(o),
         "status": o.status, "winner": o.winner, "bet_count": bet_count,
+        "closes_at": o.closes_at, "betting_open": _betting_open(o),
     }
 
 
@@ -112,6 +124,8 @@ class OddService:
         odd = await self.session.get(Odd, odd_id)
         if odd is None or odd.status != "open":
             raise NotFound("Aposta indisponível (fechada ou removida).")
+        if odd.closes_at is not None and _now() >= _aware(odd.closes_at):
+            raise OddError("As apostas para este confronto já foram encerradas.")
 
         option = _option_map(odd).get(selection)
         if option is None:
@@ -190,6 +204,7 @@ class OddAdminService:
             title=data["title"],
             type=otype,
             description=data.get("description"),
+            closes_at=data.get("closes_at"),
             status="open",
         )
         if otype == "placar":
@@ -216,6 +231,9 @@ class OddAdminService:
         for key in ("title", "description"):
             if data.get(key) is not None:
                 setattr(odd, key, data[key])
+        # closes_at: presença da chave (mesmo None) permite limpar/definir o prazo.
+        if "closes_at" in data:
+            odd.closes_at = data["closes_at"]
         if odd.type == "placar":
             if data.get("multiplier") is not None or data.get("alternatives") is not None:
                 mult = float(

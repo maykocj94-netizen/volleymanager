@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Ticket, TrendingUp, Check, History } from "lucide-react";
+import { Loader2, Ticket, TrendingUp, Check, History, Clock } from "lucide-react";
 import {
   oddLabel,
   oddOptions,
@@ -13,6 +13,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMe } from "@/lib/game";
 import { useMyBets, useOpenOdds, usePlaceBet } from "@/lib/odds";
+
+function fmtDeadline(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
 
 const BET_STATUS: Record<string, { label: string; cls: string }> = {
   pending: { label: "em aberto", cls: "bg-sky-500/20 text-sky-300" },
@@ -79,7 +84,8 @@ function OddCard({ odd: o }: { odd: Odd }) {
   const oddValue = options.find((op) => op.key === sel)?.odd ?? 0;
   const potential = sel ? oddPayout(amt, oddValue) : 0;
   const balance = currency === "gold" ? me?.gold ?? 0 : me?.silver ?? 0;
-  const canBet = !!sel && amt >= 1 && amt <= balance;
+  const closed = !o.betting_open;
+  const canBet = !closed && !!sel && amt >= 1 && amt <= balance;
 
   function bet() {
     if (!sel) return;
@@ -94,7 +100,19 @@ function OddCard({ odd: o }: { odd: Odd }) {
       <div>
         <p className="font-semibold">{o.title}</p>
         {o.description && <p className="text-xs text-ink-muted">{o.description}</p>}
+        {o.closes_at && (
+          <p className={cn("mt-0.5 flex items-center gap-1 text-[11px]", closed ? "text-amber-400" : "text-ink-faint")}>
+            <Clock className="h-3 w-3" />
+            {closed ? "Apostas encerradas em " : "Apostas até "}{fmtDeadline(o.closes_at)}
+          </p>
+        )}
       </div>
+
+      {closed && (
+        <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+          ⏱️ As apostas para este confronto foram encerradas — aguardando o resultado.
+        </p>
+      )}
 
       <div className={cn("grid gap-2", options.length <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
         {options.map((op) => (

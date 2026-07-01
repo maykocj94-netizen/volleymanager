@@ -48,6 +48,8 @@ export interface Odd {
   options: OddOption[];
   status: "open" | "settled" | "cancelled";
   winner: OddSelection | null;
+  closes_at: string | null;
+  betting_open: boolean;
   bet_count: number;
   my_bets: OddBet[];
 }

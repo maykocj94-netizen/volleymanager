@@ -38,6 +38,8 @@ class Odd(Base):
     status: Mapped[str] = mapped_column(String, default="open", nullable=False)
     # Chave vencedora: "a"/"b" (vitoria) ou a key da alternativa (placar).
     winner: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Prazo para apostar: após esta data/hora (UTC) ninguém mais pode apostar.
+    closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

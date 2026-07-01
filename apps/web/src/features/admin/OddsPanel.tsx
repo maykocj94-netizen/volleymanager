@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Plus, Trophy, Trash2, Ban, ChevronDown, ChevronUp, Flag, X } from "lucide-react";
+import { Loader2, Plus, Trophy, Trash2, Ban, ChevronDown, ChevronUp, Flag, X, Pencil, Save, Clock } from "lucide-react";
 import { ODD_TYPE_LABEL, oddLabel, oddOptions, oddPayout, type Odd, type OddType } from "@volley/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import {
   useAdminOddDetail,
   useAdminOdds,
   useAdminSettleOdd,
+  useAdminUpdateOdd,
 } from "@/lib/admin";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -18,6 +19,21 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   settled: { label: "liquidada", cls: "bg-sky-500/20 text-sky-300" },
   cancelled: { label: "cancelada", cls: "bg-graphite text-ink-muted" },
 };
+
+/** ISO(UTC) -> valor de <input type="datetime-local"> (hora local). */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+/** valor do datetime-local (hora local) -> ISO em UTC. */
+function toUtcIso(local: string): string | null {
+  return local ? new Date(local).toISOString() : null;
+}
+function fmtDeadline(iso: string | null): string {
+  if (!iso) return "sem prazo";
+  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
 
 export function OddsPanel() {
   const { data: odds, isLoading } = useAdminOdds();
@@ -54,12 +70,18 @@ function CreateForm() {
     team_b_name: "",
     team_b_odd: 2.5,
     multiplier: 2.0,
+    closes_at: "",
   });
   const [alts, setAlts] = useState<string[]>(["", ""]);
   const set = (k: string, v: unknown) => setF((s) => ({ ...s, [k]: v }));
 
   function submit() {
-    const base = { title: f.title.trim() || "Aposta", type, description: f.description.trim() || null };
+    const base = {
+      title: f.title.trim() || "Aposta",
+      type,
+      description: f.description.trim() || null,
+      closes_at: toUtcIso(f.closes_at),
+    };
     const body =
       type === "placar"
         ? { ...base, multiplier: f.multiplier, alternatives: alts.map((a) => a.trim()).filter(Boolean) }
@@ -99,9 +121,14 @@ function CreateForm() {
               </select>
             </Field>
           </div>
-          <Field label="Descrição (opcional)">
-            <input value={f.description} onChange={(e) => set("description", e.target.value)} className="input" placeholder="Detalhes do confronto" />
-          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Descrição (opcional)">
+              <input value={f.description} onChange={(e) => set("description", e.target.value)} className="input" placeholder="Detalhes do confronto" />
+            </Field>
+            <Field label="Encerrar apostas em (opcional)">
+              <input type="datetime-local" value={f.closes_at} onChange={(e) => set("closes_at", e.target.value)} className="input" />
+            </Field>
+          </div>
 
           {type === "vitoria" ? (
             <>
@@ -181,11 +208,13 @@ function CreateForm() {
 function OddRow({ odd: o }: { odd: Odd }) {
   const [open, setOpen] = useState(false);
   const [finalize, setFinalize] = useState(false);
+  const [editing, setEditing] = useState(false);
   const settle = useAdminSettleOdd();
   const cancel = useAdminCancelOdd();
   const del = useAdminDeleteOdd();
   const st = STATUS[o.status] ?? STATUS.open;
   const options = oddOptions(o);
+  const closedByTime = o.status === "open" && !o.betting_open;
 
   return (
     <Card className="space-y-2">
@@ -194,16 +223,29 @@ function OddRow({ odd: o }: { odd: Odd }) {
           <p className="flex items-center gap-2 font-semibold">
             {o.title}
             <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-bold uppercase", st.cls)}>{st.label}</span>
+            {closedByTime && (
+              <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-400">
+                apostas encerradas
+              </span>
+            )}
           </p>
           <p className="text-xs text-ink-muted">
             {ODD_TYPE_LABEL[o.type] ?? o.type} ·{" "}
             {options.map((op) => `${op.label} (${op.odd.toFixed(2)}x)${o.winner === op.key ? " 🏆" : ""}`).join("  ·  ")}
             {" "}· {o.bet_count} aposta(s)
           </p>
+          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
+            <Clock className="h-3 w-3" /> Encerra: {fmtDeadline(o.closes_at)}
+          </p>
         </div>
         <div className="flex gap-2">
           {o.status === "open" && (
-            <Button size="sm" onClick={() => setFinalize((v) => !v)}>
+            <Button size="sm" variant="subtle" onClick={() => { setEditing((v) => !v); setFinalize(false); }}>
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
+          )}
+          {o.status === "open" && (
+            <Button size="sm" onClick={() => { setFinalize((v) => !v); setEditing(false); }}>
               <Flag className="h-4 w-4" /> Finalizar
             </Button>
           )}
@@ -217,6 +259,8 @@ function OddRow({ odd: o }: { odd: Odd }) {
           )}
         </div>
       </div>
+
+      {o.status === "open" && editing && <EditForm odd={o} onDone={() => setEditing(false)} />}
 
       {o.status === "open" && finalize && (
         <div className="space-y-2 rounded-lg border border-brand/40 bg-brand/5 p-3">
@@ -245,6 +289,91 @@ function OddRow({ odd: o }: { odd: Odd }) {
 
       {open && <OddBets oddId={o.id} />}
     </Card>
+  );
+}
+
+function EditForm({ odd: o, onDone }: { odd: Odd; onDone: () => void }) {
+  const update = useAdminUpdateOdd();
+  const isPlacar = o.type === "placar";
+  const [f, setF] = useState({
+    title: o.title,
+    description: o.description ?? "",
+    team_a_name: o.team_a_name,
+    team_a_odd: o.team_a_odd,
+    team_b_name: o.team_b_name,
+    team_b_odd: o.team_b_odd,
+    multiplier: o.options[0]?.odd ?? 2.0,
+    closes_at: toLocalInput(o.closes_at),
+  });
+  const [alts, setAlts] = useState<string[]>(isPlacar ? o.options.map((x) => x.label) : ["", ""]);
+  const set = (k: string, v: unknown) => setF((s) => ({ ...s, [k]: v }));
+
+  function save() {
+    const body: Record<string, unknown> = {
+      title: f.title.trim() || o.title,
+      description: f.description.trim() || null,
+      closes_at: toUtcIso(f.closes_at),
+    };
+    if (isPlacar) {
+      body.multiplier = f.multiplier;
+      body.alternatives = alts.map((a) => a.trim()).filter(Boolean);
+    } else {
+      body.team_a_name = f.team_a_name.trim() || "Time A";
+      body.team_a_odd = f.team_a_odd;
+      body.team_b_name = f.team_b_name.trim() || "Time B";
+      body.team_b_odd = f.team_b_odd;
+    }
+    update.mutate({ id: o.id, body }, { onSuccess: onDone });
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-graphite-border bg-graphite/40 p-3">
+      <p className="text-sm font-semibold">Editar aposta</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Título"><input value={f.title} onChange={(e) => set("title", e.target.value)} className="input" /></Field>
+        <Field label="Encerrar apostas em">
+          <input type="datetime-local" value={f.closes_at} onChange={(e) => set("closes_at", e.target.value)} className="input" />
+        </Field>
+      </div>
+      <Field label="Descrição"><input value={f.description} onChange={(e) => set("description", e.target.value)} className="input" /></Field>
+      {!isPlacar ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded border border-graphite-border p-2">
+            <Field label="Time A"><input value={f.team_a_name} onChange={(e) => set("team_a_name", e.target.value)} className="input" /></Field>
+            <Field label="Odd A"><OddNum v={f.team_a_odd} on={(n) => set("team_a_odd", n)} /></Field>
+          </div>
+          <div className="rounded border border-graphite-border p-2">
+            <Field label="Time B"><input value={f.team_b_name} onChange={(e) => set("team_b_name", e.target.value)} className="input" /></Field>
+            <Field label="Odd B"><OddNum v={f.team_b_odd} on={(n) => set("team_b_odd", n)} /></Field>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded border border-graphite-border p-2 space-y-2">
+          <Field label="Multiplicador (todas)"><OddNum v={f.multiplier} on={(n) => set("multiplier", n)} /></Field>
+          {alts.map((a, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input value={a} onChange={(e) => setAlts((s) => s.map((x, j) => (j === i ? e.target.value : x)))} className="input flex-1" placeholder={`Alternativa ${i + 1}`} />
+              {alts.length > 2 && (
+                <Button size="sm" variant="ghost" onClick={() => setAlts((s) => s.filter((_, j) => j !== i))}>
+                  <X className="h-4 w-4 text-red-400" />
+                </Button>
+              )}
+            </div>
+          ))}
+          <Button size="sm" variant="subtle" onClick={() => setAlts((s) => [...s, ""])}>
+            <Plus className="h-3.5 w-3.5" /> Alternativa
+          </Button>
+        </div>
+      )}
+      <div className="flex items-center gap-3">
+        <Button size="sm" onClick={save} disabled={update.isPending}>
+          {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onDone}><X className="h-4 w-4" /> Cancelar</Button>
+        {update.isError && <span className="text-xs text-red-400">Erro ao salvar.</span>}
+      </div>
+      <p className="text-[11px] text-ink-faint">Deixe o prazo em branco para "sem prazo".</p>
+    </div>
   );
 }
 
